@@ -203,7 +203,7 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
     val c = LocalContext.current.container
     Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            app.pumpling.ui.art.ExThumb(ex, 54.dp, Modifier.clickable(onClick = onInfo))
+            app.pumpling.ui.art.ExThumb(ex, 54.dp)
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(ex.name, style = T.h3, maxLines = 2)
                 Text(ex.primary.joinToString(", ") { it.label.lowercase() }, style = T.tiny.copy(color = app.pumpling.ui.components.PRIMARY), maxLines = 1)

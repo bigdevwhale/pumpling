@@ -10,6 +10,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -106,11 +107,16 @@ fun Creature(species: String, st: Stage, pose: Pose, size: Dp, shape: Float = 70
         drawOval(Color(0x33000000), Offset(w * .22f, h * .9f), Size(w * .56f, h * .07f))
         if (st == Stage.MASTER) drawCircle(Brush.radialGradient(listOf(Color(0x66FFD36B), Color.Transparent), Offset(w / 2, h * .55f), w * .55f), w * .55f, Offset(w / 2, h * .55f))
         val wave = sin(time * 2 * PI).toFloat()
+        // breathing: on the in-breath the body rises and fills out a little (height and width together,
+        // height more), so it never looks flattened; working adds a bob, cheering a hop
+        val breath = (wave * .5f + .5f)
+        var tilt = 0f
         val (sx, sy, dy) = when (pose) {
-            Pose.IDLE -> Triple(1f + wave * .012f, 1f - wave * .016f, 0f)
-            Pose.SLEEP -> Triple(1f + wave * .015f, 1f + wave * .02f, 0f)
-            Pose.WORK -> { val w2 = sin(time * 4 * PI).toFloat(); Triple(1f - w2 * .025f, 1f + w2 * .04f, -w2 * h * .015f) }
-            Pose.CHEER -> { val hop = sin(time * 2 * PI).toFloat(); Triple(1f, 1f, -hop * hop * h * .07f) }
+            Pose.IDLE -> Triple(1f + breath * .012f, 1f + breath * .03f, 0f)
+            Pose.SLEEP -> Triple(1f + breath * .016f, 1f + breath * .035f, 0f)
+            Pose.WORK -> { val rep = sin(time * 4 * PI).toFloat() * .5f + .5f
+                Triple(1f + rep * .01f, 1f + rep * .025f, -rep * h * .02f) }
+            Pose.CHEER -> { val hop = sin(time * 2 * PI).toFloat(); tilt = sin(time * 4 * PI).toFloat() * 1.5f; Triple(1f, 1f, -hop * hop * h * .07f) }
         }
         if (img == null) { fallback(species, st, w, h, dy); return@Canvas }
         val scale = when (st) { Stage.BABY -> .62f; Stage.TEEN -> .8f; else -> .96f }
@@ -118,7 +124,7 @@ fun Creature(species: String, st: Stage, pose: Pose, size: Dp, shape: Float = 70
         // a fixed picture size, moved and stretched by the canvas transform: smooth, no pixel snapping between frames
         val bw = (img.width * box).roundToInt(); val bh = (img.height * box).roundToInt()
         val foot = Offset(w / 2, h * .93f)
-        withTransform({ translate(0f, dy); scale(sx + round, sy - round * .6f, foot) }) {
+        withTransform({ translate(0f, dy); rotate(tilt, foot); scale(sx + round, sy - round * .6f, foot) }) {
             drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(((w - bw) / 2).roundToInt(), (foot.y - bh).roundToInt()),
                 IntSize(bw, bh), filterQuality = FilterQuality.Medium, colorFilter = if (shiny) shinyFilter() else null)
         }
@@ -167,13 +173,18 @@ fun EggView(species: String, size: Dp, ready: Float, modifier: Modifier = Modifi
  * show the icon of how they are logged.
  */
 @Composable
-fun ExThumb(ex: app.pumpling.domain.Ex, size: Dp, modifier: Modifier = Modifier) {
+fun ExThumb(ex: app.pumpling.domain.Ex, size: Dp, modifier: Modifier = Modifier, info: Boolean = true) {
     val ctx = LocalContext.current
+    val open = LocalExInfo.current
     val img = if (ex.own) null else Art.get(ctx, "ex_${ex.id}")
     val col = Color(ex.cat.color)
-    Box(modifier.size(size).clip(androidx.compose.foundation.shape.RoundedCornerShape(size * .24f)).background(col.copy(alpha = .14f)),
+    Box(modifier.size(size).clip(androidx.compose.foundation.shape.RoundedCornerShape(size * .24f)).background(col.copy(alpha = .14f))
+        .then(if (info && open != null) Modifier.clickable { open(ex.id) } else Modifier),
         contentAlignment = androidx.compose.ui.Alignment.Center) {
         if (img != null) androidx.compose.foundation.Image(img, null, Modifier.size(size * .92f), filterQuality = FilterQuality.Medium)
         else app.pumpling.ui.components.Icon(app.pumpling.ui.journal.kindIcon(ex.kind), col, size * .5f)
     }
 }
+
+/** Opens an exercise's card (picture, target muscles, how to log) from anywhere; set by Root. */
+val LocalExInfo = androidx.compose.runtime.staticCompositionLocalOf<((String) -> Unit)?> { null }

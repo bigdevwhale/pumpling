@@ -105,6 +105,8 @@ class Nav {
     var draftName by mutableStateOf("")
     /** A start waiting for «Start»: a routine id, 0 for a workout without one; null when nothing is asked. */
     var askStart by mutableStateOf<Long?>(null)
+    /** The exercise whose card is open over everything. */
+    var info by mutableStateOf<String?>(null)
     fun push(s: Screen) { stack.add(s) }
     fun pop() { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) }
     fun replace(s: Screen) { pop(); push(s) }
@@ -146,6 +148,7 @@ fun Root(s: Settings) {
         Start.open = null
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(app.pumpling.ui.art.LocalExInfo provides { id: String -> nav.info = id }) {
     Box(Modifier.fillMaxSize().background(C.bg)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).statusBarsPadding()) {
@@ -179,11 +182,13 @@ fun Root(s: Settings) {
         }
         if (nav.stack.isEmpty()) Inbox(data, nav)
         nav.askStart?.let { app.pumpling.ui.workout.StartSheet(it, data, nav) }
+        nav.info?.let { app.pumpling.ui.workout.ExInfoSheet(it, data, nav) }
         nav.share?.let { ShareSheet(it, data) { nav.share = null } }
         AnimatedVisibility(note != null, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp, start = 18.dp, end = 18.dp), enter = fadeIn(), exit = fadeOut()) {
             Text(note ?: "", style = T.bodyB.copy(color = C.accInk), modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.ink).padding(horizontal = 16.dp, vertical = 11.dp))
         }
     }
+}
 }
 
 @Composable

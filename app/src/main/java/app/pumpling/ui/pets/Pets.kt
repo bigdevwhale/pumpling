@@ -17,6 +17,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import app.pumpling.ui.components.Chip
+import app.pumpling.domain.fmtDayShort
 import app.pumpling.ui.components.Icons
 import app.pumpling.ui.components.Icon
 import androidx.compose.ui.text.style.TextOverflow
@@ -214,65 +216,119 @@ private fun Silhouette(species: String) {
     else Text("?", style = T.title.copy(color = C.mute))
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun PetPage(id: Long, d: Data, nav: Nav) {
     val c = LocalContext.current.container
     val p = d.pets.firstOrNull { it.id == id } ?: run { if (d.pets.isNotEmpty()) nav.pop(); return }
-    val st = p.stage(); val sp = p.sp()
+    val st = p.stage(); val sp = p.sp(); val col = Color(sp.color)
     var rename by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf(p.name) }
     var pose by remember { mutableStateOf(Pose.IDLE) }
-    Page(p.name, { nav.pop() }) {
-        Box(Modifier.fillMaxWidth().card(22.dp).background(Color(sp.color).copy(alpha = .18f)).clickable { pose = Pose.entries[(pose.ordinal + 1) % Pose.entries.size] }.padding(12.dp), contentAlignment = Alignment.Center) {
-            if (st == Stage.EGG) PetView(p, 200.dp) else Creature(p.species, st, pose, 220.dp, p.shape.toFloat(), p.shiny)
-        }
-        if (st != Stage.EGG) Text(tr("Нажмите, чтобы он показал, что умеет", "Tap to see what it can do"), style = T.tiny, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = TextAlign.Center)
-        Spacer(Modifier.height(10.dp))
-        Card {
-            Text("${sp.name} · ${st.label}" + if (p.shiny) tr(" · редкий окрас", " · rare colouring") else "", style = T.bodyB)
-            Text(tr("Найден ${fmtDayYear(p.found)}", "Found ${fmtDayYear(p.found)}") + (if (p.hatched > 0) tr(", вылупился ${fmtDayYear(p.hatched)}", ", hatched ${fmtDayYear(p.hatched)}") else ""), style = T.small)
-            Spacer(Modifier.height(10.dp))
-            Text(tr("Способность", "Ability"), style = T.sec); Text(sp.ability, style = T.body)
-            Spacer(Modifier.height(8.dp))
-            Text(tr("Характер: ${p.nat().label}", "Nature: ${p.nat().label}"), style = T.sec); Text(p.nat().about, style = T.body)
-            Form.of(p.form)?.let { Spacer(Modifier.height(8.dp)); Text(tr("Телосложение: ${it.label}", "Build: ${it.label}"), style = T.sec); Text(it.about, style = T.body) }
-        }
-        Section(icon = Icons.SPARK, text = tr("Рост", "Growth"))
-        Card {
-            if (st == Stage.EGG) { Text(tr("До вылупления: ${fmt1(p.growth)} из ${fmt(Pets.HATCH.toLong())}", "To hatching: ${fmt1(p.growth)} of ${fmt(Pets.HATCH.toLong())}"), style = T.body)
-                Meter((p.growth / Pets.HATCH).toFloat(), Modifier.padding(top = 6.dp)) }
-            else {
-                Row { Text(tr("Рост", "Growth"), style = T.small, modifier = Modifier.weight(1f)); Text(fmt1(p.growth), style = T.smallB) }
-                Meter(Stage.progress(p), Modifier.padding(top = 4.dp))
-                Spacer(Modifier.height(8.dp))
-                Row { Text(tr("В животике", "In the belly"), style = T.small, modifier = Modifier.weight(1f)); Text(fmt1(p.belly), style = T.smallB) }
-                Row(Modifier.padding(top = 6.dp)) { Text(tr("Форма", "Shape"), style = T.small, modifier = Modifier.weight(1f)); Text(shapeWord(p.shape), style = T.smallB) }
-                Meter((p.shape / 100).toFloat(), Modifier.padding(top = 4.dp), color = C.ok)
-                Text(count(p.workouts, "тренировка вместе", "тренировки вместе", "тренировок вместе", "workout together", "workouts together"), style = T.small, modifier = Modifier.padding(top = 8.dp))
+    val deep = Color(col.red * .55f, col.green * .55f, col.blue * .55f)
+    Page(p.name, { nav.pop() }, action = {
+        if (st != Stage.EGG) Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.share = ShareReq(CardKind.PET, p.id) }, contentAlignment = Alignment.Center) { Icon(Icons.SHARE, C.ink, 22.dp) } }) {
+        // the hero: the pet big on its colour, the name and what it is on top of it
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(lerpP(col, Color.White, .35f), col, deep)))) {
+            Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+                if (st == Stage.EGG) PetView(p, 210.dp) else Creature(p.species, st, pose, 240.dp, p.shape.toFloat(), p.shiny)
+            }
+            Column(Modifier.fillMaxWidth().background(Color(0x33000000)).padding(horizontal = 18.dp, vertical = 14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.name, style = T.title.copy(color = Color.White), modifier = Modifier.weight(1f, fill = false), maxLines = 1)
+                    Box(Modifier.padding(start = 6.dp).size(34.dp).clip(CircleShape).clickable { rename = true }, contentAlignment = Alignment.Center) { Icon(Icons.EDIT, Color.White, 18.dp) }
+                }
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (listOf(sp.name, st.label) + listOfNotNull(Form.of(p.form)?.label, if (p.shiny) tr("редкий окрас", "rare") else null)).forEach { t ->
+                        Text(t, style = T.smallB.copy(color = Color.White), modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 10.dp, vertical = 4.dp)) }
+                }
             }
         }
+        if (st != Stage.EGG) Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(Pose.IDLE to tr("стоит", "stands"), Pose.WORK to tr("качается", "lifts"), Pose.CHEER to tr("радуется", "cheers"), Pose.SLEEP to tr("спит", "sleeps")).forEach { (ps, l) ->
+                Chip(l, pose == ps, Modifier.weight(1f), color = col) { pose = ps } }
+        }
+        // three numbers
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (st == Stage.EGG) {
+                StatTile(Icons.EGG, C.gold, "${((p.growth / Pets.HATCH) * 100).toInt().coerceAtMost(99)}%", tr("до вылупления", "to hatching"), Modifier.weight(1f))
+                StatTile(Icons.CAL, C.ok, fmtDayShort(p.found), tr("найдено", "found"), Modifier.weight(1f))
+            } else {
+                StatTile(Icons.SPARK, col, if (st == Stage.MASTER) "★" else "${(Stage.progress(p) * 100).toInt()}%",
+                    if (st == Stage.MASTER) tr("мастер", "master") else tr("до «${Stage.entries[st.ordinal + 1].label.lowercase()}»", "to ${Stage.entries[st.ordinal + 1].label.lowercase()}"), Modifier.weight(1f))
+                StatTile(Icons.HEART, C.ok, shapeWord(p.shape), tr("форма", "shape"), Modifier.weight(1f))
+                StatTile(Icons.GYM, C.acc, "${p.workouts}", tr("тренировок вместе", "workouts together"), Modifier.weight(1f))
+            }
+        }
+        if (st != Stage.EGG) {
+            Column(Modifier.padding(top = 10.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+                Row { Text(tr("Рост", "Growth"), style = T.small, modifier = Modifier.weight(1f)); Text(fmt1(p.growth), style = T.smallB) }
+                Meter(Stage.progress(p), Modifier.padding(top = 5.dp), color = col)
+                if (p.belly > 1) Text(tr("В животике ${fmt1(p.belly)} – станет ростом в дни отдыха", "${fmt1(p.belly)} in the belly – it turns into growth on rest days"), style = T.tiny, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+        // what makes it itself
+        Section(icon = Icons.STAR, text = tr("Особенности", "What it's like"))
+        Trait(Icons.BOLT, col, tr("Способность", "Ability"), sp.ability)
+        Trait(Icons.HEART, C.acc, tr("Характер: ", "Nature: ") + p.nat().label.lowercase(), p.nat().about)
+        Form.of(p.form)?.let { Trait(Icons.ARM, C.ok, tr("Телосложение: ", "Build: ") + it.label.lowercase(), it.about) }
+        Trait(Icons.CAL, C.mute, tr("История", "Story"), tr("Найден ${fmtDayYear(p.found)}", "Found ${fmtDayYear(p.found)}") + (if (p.hatched > 0) tr(", вылупился ${fmtDayYear(p.hatched)}", ", hatched ${fmtDayYear(p.hatched)}") else ""))
+        // what it ate, as one stripe
         val cats = p.catMap().filterValues { it > 0 }
         if (cats.isNotEmpty()) {
             Section(icon = Icons.HEART, text = tr("Чем кормили", "What it ate"))
-            Card { val total = cats.values.sum()
-                cats.entries.sortedByDescending { it.value }.forEach { (k, v) -> val cat = Cat.of(k)
-                    Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(cat.label, style = T.small, modifier = Modifier.width(110.dp)); Meter((v / total).toFloat(), Modifier.weight(1f), color = Color(cat.color), h = 7.dp)
-                        Text("${(v / total * 100).toInt()}%", style = T.smallB, modifier = Modifier.width(44.dp), textAlign = TextAlign.End) } }
-                if (st < Stage.ADULT) Text(tr("Когда вырастет, телосложение выберется по этой еде: сейчас это ${Form.from(cats).label.lowercase()}.", "When grown, its build follows this food: right now, ${Form.from(cats).label.lowercase()}."), style = T.small, modifier = Modifier.padding(top = 6.dp))
+            Column(Modifier.fillMaxWidth().card(18.dp).padding(14.dp)) {
+                val total = cats.values.sum(); val sorted = cats.entries.sortedByDescending { it.value }
+                app.pumpling.ui.components.Stripe(sorted.map { Color(Cat.of(it.key).color) to (it.value * 100).toInt() }, h = 12.dp)
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    sorted.filter { it.value / total >= .01 }.forEach { (k, v) -> val cat = Cat.of(k)
+                        Row(verticalAlignment = Alignment.CenterVertically) { app.pumpling.ui.components.Dot(Color(cat.color), 9.dp)
+                            Text(" ${cat.label.lowercase()} ${(v / total * 100).toInt()}%", style = T.small.copy(color = C.ink)) } }
+                }
+                if (st < Stage.ADULT) Text(tr("Когда вырастет, телосложение выберется по этой еде – сейчас это «${Form.from(cats).label.lowercase()}».", "When grown, its build follows this food – right now «${Form.from(cats).label.lowercase()}»."),
+                    style = T.tiny, modifier = Modifier.padding(top = 8.dp))
             }
         }
-        Section(icon = Icons.TARGET, text = tr("Место", "Place"))
+        // where it stands
+        Section(icon = Icons.TARGET, text = tr("Место в команде", "Place on the team"))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(tr("Ведущий", "Leader") to 0, tr("Рядом", "Beside") to 1, tr("Рядом", "Beside") to 2, tr("Дома", "At home") to -1).forEach { (l, sl) ->
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(if (p.slot == sl) C.acc else C.card2).clickable { c.write { setSlot(p, sl) } }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                    Text(l, style = T.smallB.copy(color = if (p.slot == sl) Color.White else C.ink)) } }
+            listOf(Triple(tr("Ведущий", "Leader"), 0, Icons.STAR), Triple(tr("Рядом", "Beside"), 1, Icons.PAW), Triple(tr("Рядом", "Beside"), 2, Icons.PAW), Triple(tr("Дома", "At home"), -1, Icons.HOME)).forEach { (l, sl, ic) ->
+                val on = p.slot == sl
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(if (on) col else C.card).clickable { c.write { setSlot(p, sl) } }.padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(ic, if (on) Color.White else C.mute, 18.dp)
+                    Text(l, style = T.tiny.copy(color = if (on) Color.White else C.ink), modifier = Modifier.padding(top = 3.dp))
+                } }
         }
-        Spacer(Modifier.height(14.dp))
-        if (rename) { Field(name, { name = it }, tr("Имя", "Name"), Modifier.fillMaxWidth())
-            Btn(tr("Сохранить имя", "Save the name"), Modifier.fillMaxWidth().padding(top = 8.dp), enabled = name.isNotBlank()) { c.write { dao.update(p.copy(name = name.trim())) }; rename = false } }
-        else Ghost(tr("Переименовать", "Rename"), Modifier.fillMaxWidth()) { rename = true }
-        Spacer(Modifier.height(8.dp))
-        if (st != Stage.EGG) Btn(tr("Поделиться открыткой", "Share a card"), Modifier.fillMaxWidth()) { nav.share = ShareReq(CardKind.PET, p.id) }
+        Text(when (p.slot) { 0 -> tr("Ведущий ест всё, что вы натренируете", "The leader eats everything you train"); -1 -> tr("Дома питомец отдыхает и не ест", "At home the pet rests and doesn't eat")
+            else -> tr("Рядом с ведущим – половина еды", "Beside the leader – half the food") }, style = T.tiny, modifier = Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(16.dp))
+        if (st != Stage.EGG) Btn(tr("Поделиться открыткой", "Share a card"), Modifier.fillMaxWidth(), color = col) { nav.share = ShareReq(CardKind.PET, p.id) }
+    }
+    if (rename) {
+        var name by remember { mutableStateOf(p.name) }
+        app.pumpling.ui.components.Popup({ rename = false }) {
+            Text(tr("Как зовут питомца?", "What's its name?"), style = T.h2)
+            Field(name, { name = it }, tr("Имя", "Name"), Modifier.fillMaxWidth().padding(top = 12.dp))
+            Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth().padding(top = 14.dp), enabled = name.isNotBlank()) { c.write { dao.update(p.copy(name = name.trim())) }; rename = false }
+        }
     }
 }
+
+@Composable
+private fun StatTile(icon: Icons, tint: Color, value: String, label: String, modifier: Modifier) {
+    Column(modifier.fillMaxHeight().card(18.dp).padding(12.dp)) {
+        app.pumpling.ui.components.Badge(icon, tint, 32.dp)
+        Text(value, style = T.h3, modifier = Modifier.padding(top = 8.dp), maxLines = 1)
+        Text(label, style = T.tiny, maxLines = 2)
+    }
+}
+
+@Composable
+private fun Trait(icon: Icons, tint: Color, title: String, text: String) {
+    Row(Modifier.padding(bottom = 8.dp).fillMaxWidth().card(18.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        app.pumpling.ui.components.Badge(icon, tint, 38.dp)
+        Column(Modifier.weight(1f).padding(start = 12.dp)) { Text(title, style = T.bodyB); Text(text, style = T.small.copy(color = C.ink)) }
+    }
+}
+
+private fun lerpP(a: Color, b: Color, t: Float) = Color(a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t, 1f)

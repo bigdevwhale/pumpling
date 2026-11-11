@@ -134,7 +134,7 @@ class AppContainer(context: Context) {
         val tally = Tally(all + finished, allSets.filter { it.workoutId != workoutId && it.workoutId in (all.map { it.id }.toSet()) } + marked, s)
         val eggs = Engine.finds(tally, fed.map { it.species }.toSet())
         val freeSlots = (0..2).filter { sl -> fed.none { it.slot == sl } }.toMutableList()
-        for (e in eggs) dao.insert(newPet(e, freeSlots.removeFirstOrNull() ?: -1))
+        for (e in eggs) dao.insert(newPet(e, freeSlots.removeFirstOrNull() ?: -1).copy(found = dayOf(finished.start)))   // the day of that workout
         // quests
         val week = weekStart(today())
         val wk = weekData(week, all + finished, allSets.filter { it.workoutId != workoutId } + marked)

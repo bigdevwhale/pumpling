@@ -300,7 +300,7 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
                 Text(count(plans.size, "упражнение", "упражнения", "упражнений", "exercise", "exercises") + " · " + tr("${plans.sumOf { it.sets }} подходов", "${plans.sumOf { it.sets }} sets"), style = T.bodyB)
                 plans.forEach { p -> val ex = Catalog.of(p.exId)
                     Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Dot(Color(ex.cat.color), 8.dp)
+                        app.pumpling.ui.art.ExThumb(ex, 40.dp)
                         Text(ex.name, style = T.body, modifier = Modifier.weight(1f).padding(start = 10.dp), maxLines = 1)
                         Text(when (ex.kind) { Kind.CARDIO, Kind.MINUTES -> tr("${p.secs / 60} мин", "${p.secs / 60} min"); Kind.HOLD -> "${p.sets}\u00a0×\u00a0${p.secs}" + tr("\u00a0с", "\u00a0s"); else -> "${p.sets}\u00a0×\u00a0${p.reps}" }, style = T.smallB)
                     } }
@@ -311,5 +311,36 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
             Ghost(tr("Отмена", "Cancel"), Modifier.weight(1f)) { nav.askStart = null }
             Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) { nav.askStart = null; c.write { start(r) }; nav.push(Screen.Live) }
         }
+    }
+}
+
+/** An exercise's card over any screen: the picture, the target muscles, how to log it, your best, and the way to its history. */
+@Composable
+fun ExInfoSheet(exId: String, d: Data, nav: Nav) {
+    val ex = Catalog.of(exId)
+    val best = remember(d.doneSets) { app.pumpling.domain.Records.bests(d.doneSets.filter { it.exId == exId })[exId] }
+    app.pumpling.ui.components.Sheet({ nav.info = null }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            app.pumpling.ui.art.ExThumb(ex, 104.dp, info = false)
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(ex.name, style = T.h2)
+                Text(ex.cat.label + " · " + ex.equipLabel.lowercase(), style = T.small.copy(color = Color(ex.cat.color)))
+                if (best != null && best.sets > 0) Text(when { best.e1rm > 0 -> tr("Ваш максимум ≈ ", "Your max ≈ ") + app.pumpling.domain.wuA(best.e1rm)
+                    best.hold > 0 -> tr("Дольше всего ", "Longest ") + app.pumpling.domain.dur(best.hold); best.dist > 0 -> tr("Дальше всего ", "Furthest ") + app.pumpling.domain.km(best.dist)
+                    best.reps > 0 -> tr("Больше всего повторов: ${best.reps}", "Most reps: ${best.reps}"); else -> tr("Подходов: ${best.sets}", "Sets: ${best.sets}") }, style = T.smallB, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        if (ex.primary.isNotEmpty()) {
+            Text(tr("Целевые мышцы", "Target muscles"), style = T.sec, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+            app.pumpling.ui.components.TargetMap(ex.primary, ex.secondary, h = 210.dp)
+            Text(tr("Основные: ", "Main: ") + ex.primary.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ink), modifier = Modifier.padding(top = 8.dp))
+            if (ex.secondary.isNotEmpty()) Text(tr("Помогают: ", "Helping: ") + ex.secondary.joinToString(", ") { it.label.lowercase() }, style = T.small)
+        }
+        Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card2).padding(12.dp)) {
+            Icon(app.pumpling.ui.journal.kindIcon(ex.kind), C.acc, 18.dp)
+            Text(ex.kind.help, style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Ghost(tr("История и прогресс", "History and progress"), Modifier.fillMaxWidth()) { nav.info = null; nav.push(Screen.Exercise(exId)) }
     }
 }
