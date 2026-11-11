@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import app.pumpling.ui.art.Art
+import app.pumpling.domain.stage
 import app.pumpling.domain.fmtDayShort
 import app.pumpling.domain.weekStart
 import app.pumpling.domain.Cat
@@ -228,6 +229,7 @@ private fun PastSheet(d: Data, nav: Nav, onClose: () -> Unit) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun WorkoutPage(id: Long, d: Data, nav: Nav) {
     val c = LocalContext.current.container
@@ -237,23 +239,82 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
     var askDelete by remember { mutableStateOf(false) }
     Page(w.title.ifEmpty { tr("Тренировка", "Workout") }, { nav.pop() }, action = {
         Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.share = ShareReq(CardKind.WORKOUT, w.id) }, contentAlignment = Alignment.Center) { Icon(Icons.SHARE, C.ink, 22.dp) } }) {
-        Text("${weekday(dayOf(w.start)).replaceFirstChar { it.uppercase() }}, ${fmtDayYear(dayOf(w.start))}" + (if (w.feel > 0) "  ${FEELS[w.feel - 1]}" else ""), style = T.small, modifier = Modifier.padding(bottom = 10.dp))
         val work = sets.filter { !it.warmup }
-        TileGrid(listOf(Triple(app.pumpling.domain.span(w.end - w.start), tr("длилась", "long"), null), work.sumOf { st.tonnageOf(it) }.let { t -> val m = work.sumOf { it.meters }; if (t > 0 || m == 0.0) Triple(tonnage(t), tr("тоннаж", "tonnage"), null) else Triple(app.pumpling.domain.km(m), tr("дистанция", "distance"), null) },
-            Triple("${work.size}", tr("рабочих подходов", "working sets"), null), Triple("${w.plates}", tr("блинов", "plates"), null)), icons = listOf(Icons.CLOCK to C.ok, Icons.ARM to C.acc, Icons.LIST to C.acc, Icons.PLATE to C.gold))
-        if (w.note.isNotBlank()) Card(Modifier.padding(top = 10.dp)) { Text(w.note, style = T.body) }
-        sets.groupBy { it.block }.toSortedMap().values.forEach { l -> val ex = Catalog.of(l.first().exId)
-            Column(Modifier.padding(top = 10.dp).fillMaxWidth().card(18.dp).clickable { nav.push(Screen.Exercise(ex.id)) }.padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) { Dot(Color(ex.cat.color)); Text(ex.name, style = T.h3, modifier = Modifier.padding(start = 8.dp)) }
-                var n = 0
-                l.sortedBy { it.idx }.forEach { s -> if (!s.warmup) n++
-                    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (s.warmup) tr("Р", "W") else "$n", style = T.smallB.copy(color = if (s.warmup) C.gold else C.mute), modifier = Modifier.width(26.dp))
-                        Text(setLine(ex, s), style = T.numS, modifier = Modifier.weight(1f))
-                        if (s.rpe > 0) Text("RPE ${s.rpe}  ", style = T.tiny)
-                        s.pr.split(',').mapNotNull { Rec.of(it) }.firstOrNull()?.let { Icon(Icons.STAR, C.gold, 14.dp); Text(" ${it.label}", style = T.tiny.copy(color = C.gold)) }
-                    } }
-                if (ex.kind == Kind.WEIGHT) Text(tr("Тоннаж ", "Tonnage ") + tonnage(l.filter { !it.warmup }.sumOf { st.tonnageOf(it) }), style = T.tiny, modifier = Modifier.padding(top = 6.dp))
+        val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
+        val col = cats.firstOrNull()?.key?.let { Color(it.color) } ?: C.acc
+        val tons = work.sumOf { st.tonnageOf(it) }; val meters = work.sumOf { it.meters }
+        val time = java.time.Instant.ofEpochMilli(w.start).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        // the head: when, how long, how much, and who led
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(col, lerpC(col, Color.Black, .4f)))).padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${weekday(dayOf(w.start)).replaceFirstChar { it.uppercase() }}, ${fmtDayYear(dayOf(w.start))}", style = T.small.copy(color = Color(0xDDFFFFFF)))
+                    Text(tr("в ", "at ") + "%d:%02d".format(time.hour, time.minute) + (if (w.feel > 0) "  ${FEELS[w.feel - 1]}" else ""), style = T.small.copy(color = Color(0xDDFFFFFF)))
+                    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                        listOfNotNull(app.pumpling.domain.span(w.end - w.start) to tr("длилась", "long"),
+                            if (tons > 0) tonnage(tons) to tr("поднято", "lifted") else if (meters > 0) app.pumpling.domain.km(meters) to tr("дистанция", "distance") else null,
+                            "${work.size}" to tr("подходов", "sets")).forEach { (v, l) ->
+                            Column { Text(v, style = T.numS.copy(color = Color.White), maxLines = 1); Text(l, style = T.tiny.copy(color = Color(0xCCFFFFFF))) } }
+                    }
+                }
+                if (w.leader.isNotEmpty()) { val pet = d.pets.firstOrNull { it.species == w.leader && it.stage() != app.pumpling.domain.Stage.EGG }
+                    app.pumpling.ui.art.Creature(w.leader, pet?.stage() ?: app.pumpling.domain.Stage.ADULT, app.pumpling.ui.art.Pose.CHEER, 92.dp, pet?.shape?.toFloat() ?: 70f, pet?.shiny ?: false) }
+            }
+            if (cats.isNotEmpty()) Row(Modifier.padding(top = 14.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50))) {
+                cats.forEach { (cc, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(cc.color))) } }
+        }
+        // what it brought
+        Row(Modifier.padding(top = 10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOfNotNull(Triple(Icons.PLATE, C.gold, tr("+${w.plates} блинов", "+${w.plates} plates")).takeIf { w.plates > 0 },
+                Triple(Icons.HEART, C.acc, tr("еды: ${app.pumpling.domain.fmt1(w.food)}", "food: ${app.pumpling.domain.fmt1(w.food)}")).takeIf { w.food > 0 },
+                Triple(Icons.TROPHY, C.gold, count(w.prs, "рекорд", "рекорда", "рекордов", "record", "records")).takeIf { w.prs > 0 }).forEach { (ic, tint, t) ->
+                Row(Modifier.clip(RoundedCornerShape(50)).background(tint.copy(alpha = .13f)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(ic, tint, 16.dp); Text(" $t", style = T.smallB.copy(color = C.ink)) } }
+        }
+        if (w.note.isNotBlank()) Row(Modifier.padding(top = 10.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+            Icon(Icons.EDIT, C.mute, 18.dp); Text(w.note, style = T.body, modifier = Modifier.padding(start = 10.dp)) }
+        // the records, gold
+        val recs = sets.mapNotNull { s -> s.pr.split(',').mapNotNull { Rec.of(it) }.takeIf { it.isNotEmpty() }?.let { s to it } }
+        if (recs.isNotEmpty()) {
+            Section(icon = Icons.TROPHY, text = tr("Рекорды", "Records"))
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.goldSoft).padding(horizontal = 14.dp, vertical = 8.dp)) {
+                recs.forEach { (s, r) -> val ex = Catalog.of(s.exId)
+                    Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.STAR, C.gold, 16.dp)
+                        Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(ex.name, style = T.bodyB, maxLines = 2); Text(r.joinToString(", ") { it.label.lowercase() }, style = T.tiny.copy(color = C.gold)) }
+                        Text(setLine(ex, s), style = T.bodyB.copy(color = C.ink), modifier = Modifier.padding(start = 8.dp)) } }
+            }
+        }
+        // what it worked
+        val prim = work.flatMap { Catalog.of(it.exId).primary }.distinct()
+        if (prim.isNotEmpty()) {
+            val sec = work.flatMap { Catalog.of(it.exId).secondary }.distinct() - prim.toSet()
+            Section(icon = Icons.ARM, text = tr("Что тренировали", "What it worked"))
+            Column(Modifier.fillMaxWidth().card(20.dp).padding(14.dp)) {
+                app.pumpling.ui.components.TargetMap(prim, sec, h = 180.dp)
+                Text(tr("Основные: ", "Main: ") + prim.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ink), modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+        Section(icon = Icons.GYM, text = tr("Упражнения", "Exercises"))
+        sets.groupBy { it.block }.toSortedMap().values.forEach { l -> val ex = Catalog.of(l.first().exId); val ec = Color(ex.cat.color)
+            Column(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).clickable { nav.push(Screen.Exercise(ex.id)) }.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    app.pumpling.ui.art.ExThumb(ex, 46.dp)
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text(ex.name, style = T.bodyB, maxLines = 2)
+                        Text(listOfNotNull(ex.cat.label, if (ex.kind == Kind.WEIGHT) tonnage(l.filter { !it.warmup }.sumOf { st.tonnageOf(it) }) else null).joinToString(" · "), style = T.tiny.copy(color = ec))
+                    }
+                }
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    l.sortedBy { it.idx }.forEach { s -> val rec = s.pr.isNotBlank()
+                        Row(Modifier.clip(RoundedCornerShape(10.dp)).background(when { rec -> C.goldSoft; s.warmup -> C.bg; else -> ec.copy(alpha = .11f) }).padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            if (rec) Icon(Icons.STAR, C.gold, 13.dp)
+                            if (s.warmup) Text(tr("разм. ", "warm "), style = T.tiny)
+                            Text((if (rec) " " else "") + setLine(ex, s), style = T.smallB.copy(color = if (s.warmup) C.mute else C.ink))
+                            if (s.rpe > 0) Text(" · RPE ${s.rpe}", style = T.tiny)
+                        } }
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
