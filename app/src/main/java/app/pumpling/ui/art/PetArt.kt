@@ -107,16 +107,11 @@ fun Creature(species: String, st: Stage, pose: Pose, size: Dp, shape: Float = 70
         drawOval(Color(0x33000000), Offset(w * .22f, h * .9f), Size(w * .56f, h * .07f))
         if (st == Stage.MASTER) drawCircle(Brush.radialGradient(listOf(Color(0x66FFD36B), Color.Transparent), Offset(w / 2, h * .55f), w * .55f), w * .55f, Offset(w / 2, h * .55f))
         val wave = sin(time * 2 * PI).toFloat()
-        // breathing: on the in-breath the body rises and fills out a little (height and width together,
-        // height more), so it never looks flattened; working adds a bob, cheering a hop
-        val breath = (wave * .5f + .5f)
-        var tilt = 0f
         val (sx, sy, dy) = when (pose) {
-            Pose.IDLE -> Triple(1f + breath * .012f, 1f + breath * .03f, 0f)
-            Pose.SLEEP -> Triple(1f + breath * .016f, 1f + breath * .035f, 0f)
-            Pose.WORK -> { val rep = sin(time * 4 * PI).toFloat() * .5f + .5f
-                Triple(1f + rep * .01f, 1f + rep * .025f, -rep * h * .02f) }
-            Pose.CHEER -> { val hop = sin(time * 2 * PI).toFloat(); tilt = sin(time * 4 * PI).toFloat() * 1.5f; Triple(1f, 1f, -hop * hop * h * .07f) }
+            Pose.IDLE -> Triple(1f + wave * .012f, 1f - wave * .016f, 0f)
+            Pose.SLEEP -> Triple(1f + wave * .015f, 1f + wave * .02f, 0f)
+            Pose.WORK -> { val w2 = sin(time * 4 * PI).toFloat(); Triple(1f - w2 * .025f, 1f + w2 * .04f, -w2 * h * .015f) }
+            Pose.CHEER -> { val hop = sin(time * 2 * PI).toFloat(); Triple(1f, 1f, -hop * hop * h * .07f) }
         }
         if (img == null) { fallback(species, st, w, h, dy); return@Canvas }
         val scale = when (st) { Stage.BABY -> .62f; Stage.TEEN -> .8f; else -> .96f }
@@ -124,7 +119,7 @@ fun Creature(species: String, st: Stage, pose: Pose, size: Dp, shape: Float = 70
         // a fixed picture size, moved and stretched by the canvas transform: smooth, no pixel snapping between frames
         val bw = (img.width * box).roundToInt(); val bh = (img.height * box).roundToInt()
         val foot = Offset(w / 2, h * .93f)
-        withTransform({ translate(0f, dy); rotate(tilt, foot); scale(sx + round, sy - round * .6f, foot) }) {
+        withTransform({ translate(0f, dy); scale(sx + round, sy - round * .6f, foot) }) {
             drawImage(img, IntOffset.Zero, IntSize(img.width, img.height), IntOffset(((w - bw) / 2).roundToInt(), (foot.y - bh).roundToInt()),
                 IntSize(bw, bh), filterQuality = FilterQuality.Medium, colorFilter = if (shiny) shinyFilter() else null)
         }
