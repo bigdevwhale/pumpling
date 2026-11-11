@@ -113,11 +113,15 @@ private fun History(d: Data, nav: Nav) {
         return if (cardio * 2 >= l.size) 2 else 1 }
     val list = d.finished.sortedByDescending { it.start }.filter { w -> when (filter) { 1 -> kindOf(w) == 1; 2 -> kindOf(w) == 2; 3 -> w.prs > 0; else -> true } }
     val byWeek = list.groupBy { weekStart(dayOf(it.start)) }
+    // this week and the last one open; older weeks fold into their header (any filter opens everything)
+    val now = weekStart(today())
+    var opened by remember { mutableStateOf(setOf(now, now - 7)) }
     LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 40.dp)) {
         item(key = "hint") { app.pumpling.ui.components.Hint("journal", d.s.seen, Icons.LOG, tr("Журнал тренировок", "Your workouts"), tr("Все тренировки по неделям. Цветная полоска показывает, что тренировали, кубок – рекорды. «+ прошедшая» – записать тренировку задним числом.",
             "Every workout by week. The coloured stripe shows what was trained, the cup – records. «+ past one» logs a workout afterwards."), Modifier.padding(bottom = 10.dp)) }
+        item(key = "glance") { Glance(d) }
         item(key = "filter") {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(tr("Все", "All"), tr("Силовые", "Strength"), tr("Кардио", "Cardio"), tr("С рекордами", "With records")).forEachIndexed { i, l -> Chip(l, filter == i) { filter = i } } }
         }
         if (list.isEmpty()) item { Empty(tr("Таких тренировок пока нет", "No such workouts yet")) }
@@ -125,12 +129,15 @@ private fun History(d: Data, nav: Nav) {
             item(key = "w$mon") {
                 val work = ws.flatMap { w -> d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup } }
                 val days = ws.map { dayOf(it.start) }.toSet(); val met = days.size >= d.s.weekGoal
-                Column(Modifier.padding(top = 20.dp, bottom = 8.dp, start = 4.dp, end = 4.dp)) {
+                val open = filter != 0 || mon in opened
+                Column(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .clickable(enabled = filter == 0) { opened = if (mon in opened) opened - mon else opened + mon }.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (mon == weekStart(today())) tr("Эта неделя", "This week") else if (mon == weekStart(today()) - 7) tr("Прошлая неделя", "Last week")
                             else "${fmtDayShort(mon)} – ${fmtDayShort(mon + 6)}", style = T.h3, modifier = Modifier.weight(1f))
                         if (met) Row(Modifier.clip(RoundedCornerShape(50)).background(C.ok.copy(alpha = .14f)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.CHECK, C.ok, 13.dp); Text(" " + tr("цель", "goal"), style = T.tiny.copy(color = C.ok)) }
+                        if (filter == 0) Icon(if (open) Icons.UP else Icons.DOWN, C.mute, 20.dp, Modifier.padding(start = 6.dp))
                     }
                     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         (0..6).forEach { i -> val day = mon + i; val w = ws.firstOrNull { dayOf(it.start) == day }
@@ -140,7 +147,7 @@ private fun History(d: Data, nav: Nav) {
                     }
                 }
             }
-            item(key = "c$mon") {
+            if (filter != 0 || mon in opened) item(key = "c$mon") {
                 // a week is one card, its workouts quiet rows inside it
                 Column(Modifier.fillMaxWidth().card(18.dp)) {
                     ws.forEachIndexed { i, w ->
@@ -148,6 +155,24 @@ private fun History(d: Data, nav: Nav) {
                         HistoryRow(w, d, st) { nav.push(Screen.WorkoutView(w.id)) }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Three small numbers over the history: this month's workouts and time, and the weeks in a row. */
+@Composable
+private fun Glance(d: Data) {
+    val t = today(); val m0 = java.time.LocalDate.ofEpochDay(t).withDayOfMonth(1).toEpochDay()
+    val month = d.finished.filter { dayOf(it.start) >= m0 }
+    val weeks = remember(d.finished, d.s) { app.pumpling.domain.Weeks(d.finished.map { dayOf(it.start) }.toSet(), d.s.weekGoal, d.s.sickDays) }
+    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(Triple(Icons.CAL, C.acc, "${month.size}" to tr("тренировок\nв этом месяце", "workouts\nthis month")),
+            Triple(Icons.CLOCK, C.ok, app.pumpling.domain.span(month.sumOf { it.end - it.start }) to tr("в зале\nза месяц", "training\nthis month")),
+            Triple(Icons.FLAME, C.gold, "${weeks.streak}" to tr("недель подряд\nс целью", "weeks in a row\non goal"))).forEach { (ic, col, v) ->
+            Column(Modifier.weight(1f).fillMaxHeight().card(16.dp).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) { Icon(ic, col, 16.dp); Text("  " + v.first, style = T.bodyB, maxLines = 1) }
+                Text(v.second, style = T.tiny, modifier = Modifier.padding(top = 3.dp))
             }
         }
     }
@@ -331,7 +356,7 @@ private fun Routines(d: Data, nav: Nav) {
             say(tr("«${tr(t0.ru, t0.en)}» – в ваших программах", "«${tr(t0.ru, t0.en)}» added")) }; ready = false } else look = null }; return@Sheet }
         Text(tr("Готовые программы", "Ready routines"), style = T.h2)
         Text(count(TEMPLATES.size, "программа", "программы", "программ", "routine", "routines") + tr(" – нажмите, чтобы посмотреть", " – tap one to look inside"), style = T.small, modifier = Modifier.padding(bottom = 10.dp))
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Chip(tr("Где угодно", "Anywhere"), place == null) { place = null }
             Place.entries.forEach { pl -> Chip(pl.label, place == pl) { place = pl } } }
         Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
