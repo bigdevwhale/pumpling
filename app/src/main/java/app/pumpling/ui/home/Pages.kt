@@ -293,6 +293,7 @@ fun SettingsPage(d: Data, nav: Nav) {
                     Ghost(tr("Листать", "Open"), Modifier.fillMaxWidth(), small = true) { nav.push(Screen.Wrapped(java.time.LocalDate.now().year)) } }
                 Setting(Icons.HOME, C.ok, tr("О приложении", "About"), tr("Pumpling работает без аккаунта. Все тренировки и питомцы хранятся только на телефоне; в интернет уходят лишь координаты города для погоды.",
                     "Pumpling needs no account. Workouts and pets stay on the phone; only the town's coordinates go online, for the weather."))
+                Text(tr("Контуры карты мышц – react-native-body-highlighter, MIT © 2022 ELABBASSI Hicham. Погода – Open-Meteo и MET Norway.", "Muscle map outlines: react-native-body-highlighter, MIT © 2022 ELABBASSI Hicham. Weather: Open-Meteo and MET Norway."), style = T.tiny, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
             }
         }
     }

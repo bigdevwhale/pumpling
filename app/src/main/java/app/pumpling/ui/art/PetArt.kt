@@ -10,6 +10,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -157,5 +159,21 @@ fun EggView(species: String, size: Dp, ready: Float, modifier: Modifier = Modifi
                 }
             }
         }
+    }
+}
+
+/**
+ * An exercise's picture in a soft tile of its family's colour; own exercises (and any without a picture)
+ * show the icon of how they are logged.
+ */
+@Composable
+fun ExThumb(ex: app.pumpling.domain.Ex, size: Dp, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    val img = if (ex.own) null else Art.get(ctx, "ex_${ex.id}")
+    val col = Color(ex.cat.color)
+    Box(modifier.size(size).clip(androidx.compose.foundation.shape.RoundedCornerShape(size * .24f)).background(col.copy(alpha = .14f)),
+        contentAlignment = androidx.compose.ui.Alignment.Center) {
+        if (img != null) androidx.compose.foundation.Image(img, null, Modifier.size(size * .92f), filterQuality = FilterQuality.Medium)
+        else app.pumpling.ui.components.Icon(app.pumpling.ui.journal.kindIcon(ex.kind), col, size * .5f)
     }
 }

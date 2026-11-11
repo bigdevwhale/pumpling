@@ -67,11 +67,18 @@ data class Ex(
     val id: String, val ru: String, val en: String, val kind: Kind, val primary: List<Muscle>, val secondary: List<Muscle>,
     val equip: Equip, val cat: Cat, val own: Boolean = false,
     val gear: String = "",   // the user's own equipment by name; empty for the built-in kinds
+    val aliases: String = "", // other names people search by
 ) {
     val name get() = if (own) ru else tr(ru, en)
     /** The equipment as shown: the user's own name or the built-in kind. */
     val equipLabel get() = gear.ifEmpty { equip.label }
     val muscles get() = primary + secondary
+    /** Does a search query match: name in either language, synonyms, muscles or equipment; «ё» counts as «е». */
+    fun matches(q: String): Boolean {
+        val n = norm(q); if (n.isEmpty()) return true
+        val hay = norm(listOf(ru, en, aliases, gear, equip.ru, equip.en, cat.ru, cat.en).joinToString(" ") + " " + muscles.joinToString(" ") { it.ru + " " + it.en })
+        return n.split(' ').filter { it.isNotBlank() }.all { w -> hay.contains(w) }
+    }
     /** «Подтягивания», «отжимания» and the like count your own weight into the tonnage. */
     val bodyweight get() = kind == Kind.BODY || kind == Kind.ASSIST
 }
@@ -84,7 +91,7 @@ object Catalog {
         builtin ?: ctx.assets.open("exercises.tsv").bufferedReader().readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
             val c = line.split('\t')
             fun ms(s: String) = s.split(',').mapNotNull { Muscle.of(it.trim()) }
-            Ex(c[0], c[1], c[2], Kind.of(c[3][0]), ms(c[4]), ms(c.getOrElse(5) { "" }), Equip.of(c.getOrElse(6) { "" }), Cat.of(c.getOrElse(7) { "" }))
+            Ex(c[0], c[1], c[2], Kind.of(c[3][0]), ms(c[4]), ms(c.getOrElse(5) { "" }), Equip.of(c.getOrElse(6) { "" }), Cat.of(c.getOrElse(7) { "" }), aliases = c.getOrElse(8) { "" })
         }.also { builtin = it }
     }
 
@@ -93,7 +100,7 @@ object Catalog {
         builtin = lines.filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
             val c = line.split('\t')
             fun ms(s: String) = s.split(',').mapNotNull { Muscle.of(it.trim()) }
-            Ex(c[0], c[1], c[2], Kind.of(c[3][0]), ms(c[4]), ms(c.getOrElse(5) { "" }), Equip.of(c.getOrElse(6) { "" }), Cat.of(c.getOrElse(7) { "" }))
+            Ex(c[0], c[1], c[2], Kind.of(c[3][0]), ms(c[4]), ms(c.getOrElse(5) { "" }), Equip.of(c.getOrElse(6) { "" }), Cat.of(c.getOrElse(7) { "" }), aliases = c.getOrElse(8) { "" })
         }
     }
 
@@ -106,3 +113,5 @@ object Catalog {
     }
     fun of(id: String): Ex = byId(id) ?: Ex(id, id, id, Kind.WEIGHT, emptyList(), emptyList(), Equip.OTHER, Cat.PUSH)
 }
+
+fun norm(s: String) = s.lowercase().replace('ё', 'е').replace(Regex("[^\\p{L}\\p{N} ]"), " ").replace(Regex(" +"), " ").trim()

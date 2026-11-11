@@ -82,6 +82,23 @@ def main():
         g = g.resize((960, round(960 * g.height / g.width)), Image.LANCZOS)
         g.save(OUT / "gym_bg.webp", "WEBP", quality=88, method=6)
         print("gym")
+    exercises()
+
+
+def exercises():
+    """art/ex/sheet_NN.png (3×3) → ex_<id>.webp, ids from art/ex/sheets.json."""
+    import json
+    d = ROOT / "art" / "ex"
+    if not (d / "sheets.json").exists():
+        return
+    for n, ids in enumerate(json.loads((d / "sheets.json").read_text(encoding="utf-8"))):
+        f = d / f"sheet_{n:02d}.png"
+        if not f.exists():
+            continue
+        for i, fr in zip(ids, frames(f, 3, 3)):
+            fr.thumbnail((256, 256), Image.LANCZOS)
+            fr.save(OUT / f"ex_{i}.webp", "WEBP", quality=88, method=6)
+    print("exercises")
 
 
 if __name__ == "__main__":

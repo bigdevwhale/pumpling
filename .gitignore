@@ -14,3 +14,5 @@
 /design
 /art/*.log
 /art/*.txt
+/art/ex/ref_*.png
+/art/gen*.log

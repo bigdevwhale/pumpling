@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import app.pumpling.ui.components.card
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -84,8 +85,26 @@ fun ExercisePage(exId: String, d: Data, nav: Nav) {
     Page(ex.name, { nav.pop() }, action = {
         if (ex.own) Text(tr("Изменить", "Edit"), style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(end = 4.dp).clickable { nav.push(Screen.OwnEdit(exId.drop(1).toLong())) })
         if (all.isNotEmpty()) Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.share = ShareReq(CardKind.EXERCISE, ex = exId) }, contentAlignment = Alignment.Center) { Icon(Icons.SHARE, C.ink, 22.dp) } }) {
-        Text((ex.primary.map { it.label } + ex.secondary.map { it.label.lowercase() }).joinToString(", ") + " · " + ex.equipLabel + " · " + ex.cat.label, style = T.small, modifier = Modifier.padding(bottom = 10.dp))
-        if (all.isEmpty()) { Empty(tr("Это упражнение ещё не делали", "Not done yet")); return@Page }
+        Row(Modifier.fillMaxWidth().card(22.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            app.pumpling.ui.art.ExThumb(ex, 132.dp)
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(ex.cat.label, style = T.sec.copy(color = Color(ex.cat.color)))
+                Text(ex.equipLabel, style = T.bodyB, modifier = Modifier.padding(top = 4.dp))
+                Text(ex.kind.name1, style = T.small)
+            }
+        }
+        if (ex.primary.isNotEmpty()) {
+            Section(icon = Icons.ARM, text = tr("Целевые мышцы", "Target muscles"))
+            Card {
+                app.pumpling.ui.components.TargetMap(ex.primary, ex.secondary, h = 200.dp)
+                Text(tr("Основные: ", "Main: ") + ex.primary.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ink), modifier = Modifier.padding(top = 8.dp))
+                if (ex.secondary.isNotEmpty()) Text(tr("Помогают: ", "Helping: ") + ex.secondary.joinToString(", ") { it.label.lowercase() }, style = T.small)
+            }
+        }
+        Section(icon = Icons.EDIT, text = tr("Как записывать", "How to log it"))
+        Card { Text(ex.kind.help, style = T.small.copy(color = C.ink)) }
+        if (all.isEmpty()) { Empty(tr("Это упражнение ещё не делали – история появится после первой тренировки", "Not done yet – the history shows after the first workout")); return@Page }
+        Section(icon = Icons.STATS, text = tr("Ваши результаты", "Your results"))
         val b = st.bests[exId]
         TileGrid(listOfNotNull(
             Triple("${hist.size}", tr("тренировок", "workouts"), null), Triple("${all.size}", tr("подходов", "sets"), null),

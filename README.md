@@ -47,6 +47,6 @@ Kotlin, Jetpack Compose, Room, DataStore. The exercise catalogue is `app/src/mai
 
 ## License
 
-MIT. Fonts Nunito, Inter and Press Start 2P (SIL OFL). Weather by [Open-Meteo](https://open-meteo.com) and [MET Norway](https://api.met.no).
+MIT. Fonts Nunito, Inter and Press Start 2P (SIL OFL). Weather by [Open-Meteo](https://open-meteo.com) and [MET Norway](https://api.met.no). The muscle map outlines come from [react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter) (MIT, © 2022 ELABBASSI Hicham).
 
 Pumpling is one of the [StillCraft](https://bigdevwhale.github.io/stillcraft/) apps.

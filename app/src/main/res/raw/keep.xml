@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Pet, egg and gym pictures are looked up by name at run time; the shrinker must keep them. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/pet_*,@drawable/egg_*,@drawable/item_*,@drawable/gym_bg" />
+    tools:keep="@drawable/pet_*,@drawable/egg_*,@drawable/item_*,@drawable/gym_bg,@drawable/ex_*" />

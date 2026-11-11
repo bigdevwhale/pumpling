@@ -55,7 +55,6 @@ import app.pumpling.ui.Data
 import app.pumpling.ui.art.Art
 import app.pumpling.ui.art.Pose
 import app.pumpling.ui.art.frameOf
-import app.pumpling.ui.components.BodyShapes
 import java.io.File
 import java.time.LocalDate
 import kotlin.math.abs
@@ -174,14 +173,12 @@ class Painter(private val ctx: Context, private val d: Data, private val look: L
             drawRoundRect(RectF(left, y + h - 50 - bh, left + bw, y + h - 50), 12f, 12f, p(if (v > 0) accent else panel))
             if (values.size <= 14) t(l, left + bw / 2, y + h - 12, 24f, reg, sub, Paint.Align.CENTER, bw + gap) }
     }
-    private fun Canvas.body(v: Map<Muscle, Double>, x: Float, y: Float, w: Float) {
-        val k = w / 230f
-        fun draw(list: List<BodyShapes.S>, dx: Float) = list.forEach { s ->
-            val col = if (s.m == null) panel or 0x22000000 else { val t = (v[s.m] ?: 0.0).toFloat().coerceIn(0f, 1f); if (t < .03f) panel or 0x33000000 else blend(0x66FFFFFF and (accent or 0xFF000000.toInt()), accent, t) }
-            val r = RectF(x + (dx + s.x - s.w / 2) * k, y + (s.y - s.h / 2) * k, x + (dx + s.x + s.w / 2) * k, y + (s.y + s.h / 2) * k)
-            if (s.r < 0) drawOval(r, p(col)) else drawRoundRect(r, s.r * k, s.r * k, p(col))
-        }
-        draw(BodyShapes.front, 5f); draw(BodyShapes.back, 125f)
+    /** The muscle figure in the box [x],[y] [w]×[h], each muscle tinted by [v] (0..1). */
+    private fun Canvas.body(v: Map<Muscle, Double>, x: Float, y: Float, w: Float, h: Float) {
+        val skin = if (light) 0x40FFFFFF else 0x26000000
+        val rest = if (light) 0x55FFFFFF else 0x40000000
+        app.pumpling.ui.components.BodyArt.draw(ctx, this, RectF(x, y, x + w, y + h), blend(back.second, skin or 0xFF000000.toInt(), .25f), if (light) 0x99FFFFFF.toInt() else 0x802A2420.toInt()) { m ->
+            val t = (v[m] ?: 0.0).toFloat().coerceIn(0f, 1f); if (t < .03f) blend(back.second, if (light) 0xFFFFFFFF.toInt() else 0xFF2A2420.toInt(), .3f) else blend(blend(back.second, accent, .35f), accent, t) }
     }
     private fun blend(a: Int, b: Int, t: Float): Int {
         fun ch(c: Int, s: Int) = (c shr s) and 0xFF
@@ -413,7 +410,7 @@ class Painter(private val ctx: Context, private val d: Data, private val look: L
         c.t(tr("${fmt(st.setsN)} рабочих подходов", "${fmt(st.setsN)} working sets"), 60f, top + 125, 34f, reg, sub)
         val ph = if (look.story) 640f else 500f
         c.panel(60f, top + 170, W - 120f, ph)
-        val bw = (ph - 40) * 230 / 204; c.body(st.muscleSets.mapValues { it.value / mx }, (W - bw) / 2, top + 190, bw)
+        c.body(st.muscleSets.mapValues { it.value / mx }, 80f, top + 190, W - 160f, ph - 40)
         var y = top + 170 + ph + 60
         Muscle.entries.sortedByDescending { st.perWeek(it) }.take(if (look.story) 8 else 4).forEach { m -> val v = st.perWeek(m)
             c.t(m.label, 60f, y, 34f, bold, ink, maxW = 300f)

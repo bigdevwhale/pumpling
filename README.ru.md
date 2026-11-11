@@ -47,6 +47,6 @@ Kotlin, Jetpack Compose, Room, DataStore. Каталог упражнений л
 
 ## Лицензия
 
-MIT. Шрифты Nunito, Inter и Press Start 2P (SIL OFL). Погода – [Open-Meteo](https://open-meteo.com) и [MET Norway](https://api.met.no).
+MIT. Шрифты Nunito, Inter и Press Start 2P (SIL OFL). Погода – [Open-Meteo](https://open-meteo.com) и [MET Norway](https://api.met.no). Контуры карты мышц – из [react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter) (MIT, © 2022 ELABBASSI Hicham).
 
 Pumpling – одно из приложений [StillCraft](https://bigdevwhale.github.io/stillcraft/).

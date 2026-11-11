@@ -75,4 +75,13 @@ class EngineTest {
         assertEquals(2, Weeks(days, 3, emptySet()).streak)
         assertEquals(2, Weeks(days, 3, emptySet()).best)
     }
+
+    @Test fun searchFindsSynonyms() {
+        val all = Catalog.all()
+        assertTrue(all.filter { it.matches("разведение ног") }.any { it.id == "abductor" })
+        assertTrue(all.filter { it.matches("гравитрон") }.any { it.id == "assisted_pullup" })
+        assertTrue(all.filter { it.matches("ЖИМ лёжа") }.any { it.id == "bench" })
+        assertTrue(all.filter { it.matches("жим леж") }.any { it.id == "bench" })
+        assertTrue(all.size >= 270)
+    }
 }

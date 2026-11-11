@@ -376,10 +376,10 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
         }
         plans.forEachIndexed { i, p -> val ex = Catalog.of(p.exId); val ec = Color(ex.cat.color)
             Row(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 12.dp)) {
-                Box(Modifier.size(32.dp).clip(CircleShape).background(ec.copy(alpha = .16f)), contentAlignment = Alignment.Center) { Text("${i + 1}", style = T.smallB.copy(color = ec)) }
+                app.pumpling.ui.art.ExThumb(ex, 48.dp)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text(ex.name, style = T.bodyB, maxLines = 2); Text(ex.cat.label, style = T.tiny.copy(color = ec)) }
+                        Column(Modifier.weight(1f)) { Text("${i + 1}. " + ex.name, style = T.bodyB, maxLines = 2); Text(ex.cat.label, style = T.tiny.copy(color = ec)) }
                         if (i > 0) Box(Modifier.size(36.dp).clip(CircleShape).clickable { val t = plans[i - 1]; plans[i - 1] = p; plans[i] = t }, contentAlignment = Alignment.Center) { Icon(Icons.UP, C.mute, 18.dp) }
                         Box(Modifier.size(36.dp).clip(CircleShape).clickable { plans.removeAt(i) }, contentAlignment = Alignment.Center) { Icon(Icons.CLOSE, C.mute, 18.dp) }
                     }
@@ -544,9 +544,9 @@ private fun TemplateView(t: Template, d: Data, onDone: (Boolean) -> Unit) {
     Spacer(Modifier.height(12.dp))
     plans.forEachIndexed { i, p -> val ex = Catalog.of(p.exId); val ec = Color(ex.cat.color)
         Row(Modifier.padding(bottom = 8.dp).fillMaxWidth().card(16.dp).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(30.dp).clip(CircleShape).background(ec.copy(alpha = .16f)), contentAlignment = Alignment.Center) { Text("${i + 1}", style = T.smallB.copy(color = ec)) }
+            app.pumpling.ui.art.ExThumb(ex, 48.dp)
             Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                Text(ex.name, style = T.bodyB)
+                Text("${i + 1}. " + ex.name, style = T.bodyB)
                 Text(ex.primary.joinToString(", ") { it.label.lowercase() } + " · " + ex.equipLabel.lowercase(), style = T.tiny, maxLines = 1)
             }
             Text(when (ex.kind) { Kind.CARDIO, Kind.MINUTES -> tr("${p.secs / 60} мин", "${p.secs / 60} min"); Kind.HOLD -> "${p.sets}\u00a0×\u00a0${p.secs}" + tr("\u00a0с", "\u00a0s"); else -> "${p.sets}\u00a0×\u00a0${p.reps}" }, style = T.numS)

@@ -81,7 +81,7 @@ fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav) {
     val used = remember(d.doneSets) { d.doneSets.groupingBy { it.exId }.eachCount() }
     val recent = remember(d.doneSets) { d.doneSets.sortedByDescending { it.doneAt }.map { it.exId }.distinct().take(8) }
     val all = Catalog.all()
-    val list = all.filter { e -> (q.isBlank() || e.name.contains(q.trim(), true) || e.en.contains(q.trim(), true) || e.ru.contains(q.trim(), true)) &&
+    val list = all.filter { e -> e.matches(q) &&
         (cat < 0 || e.cat == Cat.entries[cat]) && (eq < 0 || (if (eq < Equip.entries.size) e.equip == Equip.entries[eq] && e.gear.isEmpty() else e.gear == d.s.gear.getOrNull(eq - Equip.entries.size))) }
         .sortedWith(compareByDescending<app.pumpling.domain.Ex> { if (q.isBlank() && cat < 0 && eq < 0) (if (it.id in recent) 1000 - recent.indexOf(it.id) else 0) else 0 }.thenByDescending { used[it.id] ?: 0 })
     Page(tr("Упражнения", "Exercises"), { nav.pop() }, scroll = false, action = {
@@ -101,8 +101,8 @@ fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav) {
                 val on = e.id in picked
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (on) C.accSoft else Color.Transparent).clickable { if (on) picked.remove(e.id) else picked.add(e.id) }
                     .padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Dot(Color(e.cat.color))
-                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    app.pumpling.ui.art.ExThumb(e, 52.dp)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
                         Text(e.name, style = T.bodyB)
                         Text((e.primary.map { it.label } + e.equipLabel).joinToString(" · ") + (used[e.id]?.let { tr(" · $it подх.", " · $it sets") } ?: ""), style = T.small, maxLines = 1)
                     }
@@ -161,7 +161,7 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
         }
         Section(icon = Icons.ARM, text = tr("Какие мышцы работают", "Muscles worked"))
         Column(Modifier.fillMaxWidth().card(18.dp).padding(14.dp)) {
-            app.pumpling.ui.components.BodyMap(Muscle.entries.associateWith { if (it in prim) 1.0 else 0.0 }, color = col, h = 150.dp)
+            app.pumpling.ui.components.TargetMap(prim.toList(), emptyList(), h = 150.dp, legend = false)
             FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Muscle.entries.forEach { m -> Chip(m.label, m in prim, color = col) { if (m in prim) prim.remove(m) else prim.add(m) } } }
         }

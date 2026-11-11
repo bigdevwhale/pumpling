@@ -116,7 +116,7 @@ fun WorkoutScreen(d: Data, nav: Nav) {
             }
             items(blocks.entries.toList(), key = { "b${it.key}" }) { (b, list) ->
                 val ex = Catalog.of(list.first().exId)
-                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, onMenu = { menu = b }, onSet = { setMenu = it })
+                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, onMenu = { menu = b }, onSet = { setMenu = it }, onInfo = { nav.push(Screen.Exercise(ex.id)) })
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -135,7 +135,7 @@ fun WorkoutScreen(d: Data, nav: Nav) {
             Spacer(Modifier.height(12.dp))
             Ghost(tr("Добавить разминочный подход", "Add a warm-up set"), Modifier.fillMaxWidth()) { c.write { addSet(w.id, b, warmup = true) }; menu = null }
             Spacer(Modifier.height(8.dp))
-            Ghost(tr("История упражнения", "Exercise history"), Modifier.fillMaxWidth()) { menu = null; nav.push(Screen.Exercise(l.first().exId)) }
+            Ghost(tr("Как делать, мышцы и история", "How to, muscles and history"), Modifier.fillMaxWidth()) { menu = null; nav.push(Screen.Exercise(l.first().exId)) }
             val top = l.maxOf { it.weight }
             if (Catalog.of(l.first().exId).equip == app.pumpling.domain.Equip.BAR && top > d.s.bar) {
                 Spacer(Modifier.height(8.dp)); Ghost(tr("Блины на сторону для ${w(top)} ${unit()}", "Plates per side for ${w(top)} ${unit()}"), Modifier.fillMaxWidth()) { menu = null; plateCalc = top } }
@@ -199,12 +199,15 @@ private fun RestBar(d: Data, now: Long) {
 }
 
 @Composable
-private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, onMenu: () -> Unit, onSet: (WSet) -> Unit) {
+private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, onMenu: () -> Unit, onSet: (WSet) -> Unit, onInfo: () -> Unit) {
     val c = LocalContext.current.container
     Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Dot(androidx.compose.ui.graphics.Color(ex.cat.color))
-            Text(ex.name, style = T.h3, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 2)
+            app.pumpling.ui.art.ExThumb(ex, 54.dp, Modifier.clickable(onClick = onInfo))
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(ex.name, style = T.h3, maxLines = 2)
+                Text(ex.primary.joinToString(", ") { it.label.lowercase() }, style = T.tiny.copy(color = app.pumpling.ui.components.PRIMARY), maxLines = 1)
+            }
             Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onMenu), contentAlignment = Alignment.Center) { Icon(Icons.DOTS, C.mute, 20.dp) }
         }
         val ghost = last.filter { !it.warmup }
