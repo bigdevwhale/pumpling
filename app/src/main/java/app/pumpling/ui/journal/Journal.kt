@@ -116,9 +116,8 @@ private fun History(d: Data, nav: Nav) {
     LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 40.dp)) {
         item(key = "hint") { app.pumpling.ui.components.Hint("journal", d.s.seen, Icons.LOG, tr("Журнал тренировок", "Your workouts"), tr("Все тренировки по неделям. Цветная полоска показывает, что тренировали, кубок – рекорды. «+ прошедшая» – записать тренировку задним числом.",
             "Every workout by week. The coloured stripe shows what was trained, the cup – records. «+ past one» logs a workout afterwards."), Modifier.padding(bottom = 10.dp)) }
-        item(key = "week") { ThisWeek(d, st) }
         item(key = "filter") {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(tr("Все", "All"), tr("Силовые", "Strength"), tr("Кардио", "Cardio"), tr("С рекордами", "With records")).forEachIndexed { i, l -> Chip(l, filter == i) { filter = i } } }
         }
         if (list.isEmpty()) item { Empty(tr("Таких тренировок пока нет", "No such workouts yet")) }
@@ -131,7 +130,15 @@ private fun History(d: Data, nav: Nav) {
                     Text(listOfNotNull(count(ws.size, "тренировка", "тренировки", "тренировок", "workout", "workouts"), work.sumOf { st.tonnageOf(it) }.takeIf { it > 0 }?.let { tonnage(it) }).joinToString(" · "), style = T.small)
                 }
             }
-            items(ws, key = { it.id }) { w -> HistoryRow(w, d, st) { nav.push(Screen.WorkoutView(w.id)) } }
+            item(key = "c$mon") {
+                // a week is one card, its workouts quiet rows inside it
+                Column(Modifier.fillMaxWidth().card(18.dp)) {
+                    ws.forEachIndexed { i, w ->
+                        if (i > 0) Box(Modifier.padding(start = 66.dp).fillMaxWidth().height(1.dp).background(C.line))
+                        HistoryRow(w, d, st) { nav.push(Screen.WorkoutView(w.id)) }
+                    }
+                }
+            }
         }
     }
 }
@@ -471,34 +478,22 @@ private fun HistoryRow(w: Workout, d: Data, st: Stats, onClick: () -> Unit) {
     val day = java.time.LocalDate.ofEpochDay(dayOf(w.start))
     val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
     val main = cats.firstOrNull()?.key
-    val ctx = LocalContext.current
-    Column(Modifier.padding(bottom = 8.dp).fillMaxWidth().card(18.dp)
-        .clickable(onClick = onClick).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.size(50.dp).clip(RoundedCornerShape(14.dp)).background(main?.let { Color(it.color).copy(alpha = .15f) } ?: C.card2), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center) {
-                Text("${day.dayOfMonth}", style = T.h3.copy(color = main?.let { Color(it.color) } ?: C.ink))
-                Text(app.pumpling.domain.dayShort(day.dayOfWeek.value - 1), style = T.tiny)
-            }
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.bodyB, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    if (w.feel > 0) Text(" " + FEELS[w.feel - 1], style = T.small)
-                }
-                val t = work.sumOf { st.tonnageOf(it) }; val m = work.sumOf { it.meters }
-                Text(listOfNotNull(app.pumpling.domain.span(w.end - w.start), count(work.map { it.exId }.distinct().size, "упражнение", "упражнения", "упражнений", "exercise", "exercises"),
-                    t.takeIf { it > 0 }?.let { tonnage(it) }, m.takeIf { it > 0 && t == 0.0 }?.let { app.pumpling.domain.km(it) }).joinToString(" · "), style = T.small, maxLines = 1)
-            }
-            Art.pet(ctx, w.leader.ifEmpty { "bull" }, 2)?.let { androidx.compose.foundation.Image(it, null, Modifier.size(40.dp)) }
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.width(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${day.dayOfMonth}", style = T.h3.copy(color = main?.let { Color(it.color) } ?: C.ink))
+            Text(app.pumpling.domain.dayShort(day.dayOfWeek.value - 1), style = T.tiny)
         }
-        // what was trained, as one stripe of coloured parts
-        if (cats.isNotEmpty()) Row(Modifier.padding(top = 10.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50))) {
-            cats.forEach { (c, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(c.color))) } }
-        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(cats.take(3).joinToString(" · ") { it.key.label.lowercase() }, style = T.tiny, modifier = Modifier.weight(1f), maxLines = 1)
-            if (w.prs > 0) Row(Modifier.clip(RoundedCornerShape(50)).background(C.goldSoft).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.TROPHY, C.gold, 12.dp); Text(" " + count(w.prs, "рекорд", "рекорда", "рекордов", "record", "records"), style = T.tiny.copy(color = C.gold)) }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.bodyB, maxLines = 1)
+            val t = work.sumOf { st.tonnageOf(it) }; val m = work.sumOf { it.meters }
+            Text(listOfNotNull(app.pumpling.domain.span(w.end - w.start), t.takeIf { it > 0 }?.let { tonnage(it) }, m.takeIf { it > 0 && t == 0.0 }?.let { app.pumpling.domain.km(it) })
+                .joinToString(" · "), style = T.small, maxLines = 1)
+            // what was trained, as one thin stripe
+            if (cats.isNotEmpty()) Row(Modifier.padding(top = 6.dp).width(150.dp).height(4.dp).clip(RoundedCornerShape(50))) {
+                cats.forEach { (c, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(c.color))) } }
         }
+        if (w.prs > 0) Row(Modifier.padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.TROPHY, C.gold, 15.dp); Text(" ${w.prs}", style = T.smallB.copy(color = C.gold)) }
     }
 }
 
