@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -98,7 +99,10 @@ fun HomeScreen(d: Data, nav: Nav) {
                 contentAlignment = Alignment.Center) { Icon(Icons.SHARE, Color.White, 19.dp) }
         }
         Column(Modifier.padding(horizontal = 16.dp)) {
+            TodayCard(d, nav)
             StatusCard(d, nav)
+            MonthRow(d)
+            LastCard(d, nav)
             CheckInCard(d, nav)
             QuestFold(d)
             FreshFold(d)
@@ -133,6 +137,7 @@ private fun StatusCard(d: Data, nav: Nav) {
                 }
                 if (p.belly > 1) Column(horizontalAlignment = Alignment.End) { Text(fmt1(p.belly), style = T.numS.copy(color = C.acc)); Text(tr("переварит", "to digest"), style = T.tiny) }
             }
+            Say(d)
             Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.SPARK, C.acc, 14.dp)
                 Meter(if (st == Stage.EGG) (p.growth / Pets.HATCH).toFloat() else Stage.progress(p), Modifier.weight(1f).padding(horizontal = 8.dp), h = 6.dp)
@@ -190,8 +195,9 @@ private fun QuestFold(d: Data) {
 private fun FreshFold(d: Data) {
     val rec = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)).recovery() }
     val tired = Muscle.entries.filter { (rec[it] ?: 0.0) >= .35 }
-    if (tired.isEmpty()) return
-    app.pumpling.ui.components.Fold(icon = Icons.HEART, tint = C.ok, title = tr("Восстановление", "Recovery"), tr("Отдыхают: ", "Resting: ") + tired.joinToString(", ") { it.label.lowercase() }) {
+    if (d.finished.isEmpty()) return
+    app.pumpling.ui.components.Fold(icon = Icons.HEART, tint = C.ok, title = tr("Восстановление", "Recovery"),
+        if (tired.isEmpty()) tr("Все мышцы отдохнули", "Every muscle is rested") else tr("Отдыхают: ", "Resting: ") + tired.joinToString(", ") { it.label.lowercase() }) {
         app.pumpling.ui.components.BodyMap(rec, color = C.acc, h = 150.dp)
         val fresh = Muscle.entries.filter { (rec[it] ?: 0.0) < .2 && it != Muscle.FORE && it != Muscle.CALVES }
         if (fresh.isNotEmpty()) Text(tr("Свежие: ", "Fresh: ") + fresh.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ok), modifier = Modifier.padding(top = 6.dp))
@@ -213,5 +219,100 @@ private fun CheckInCard(d: Data, nav: Nav) {
                 ?: tr("Первая точка для графика веса и замеров", "The first point for the weight and measurement charts"), style = T.small)
         }
         Icon(Icons.NEXT, C.ok, 18.dp)
+    }
+}
+
+/** The leader says one thing worth hearing right now: how today went, what's been forgotten, what's next. */
+@Composable
+private fun Say(d: Data) {
+    val p = d.leader ?: return
+    if (p.stage() == Stage.EGG) return
+    val line = remember(d.finished, d.live, p.belly) {
+        val t = today()
+        val lastDay = d.finished.maxOfOrNull { dayOf(it.start) }
+        val lastBy = HashMap<app.pumpling.domain.Cat, Long>()
+        d.finished.forEach { w -> val day = dayOf(w.start); d.setsBy[w.id].orEmpty().filter { it.done }.forEach { x -> val c = Catalog.of(x.exId).cat; if ((lastBy[c] ?: 0) < day) lastBy[c] = day } }
+        val forgot = lastBy.filter { t - it.value in 8..60 }.maxByOrNull { t - it.value }
+        when {
+            d.live != null -> tr("Мы с вами! Каждый подход – мне на обед.", "We're with you! Every set is my lunch.")
+            lastDay == t -> if (p.belly > 1) tr("Хорошо поработали. Переварю ${fmt1(p.belly)} – и подрасту.", "Good work. I'll digest ${fmt1(p.belly)} and grow.") else tr("Сегодня уже было. Теперь отдыхаем.", "Done for today. Now we rest.")
+            forgot != null -> tr("«${forgot.key.label}» не было уже ${count((t - forgot.value).toInt(), "день", "дня", "дней", "day", "days")}. Может, сегодня?",
+                "No «${forgot.key.label.lowercase()}» for ${count((t - forgot.value).toInt(), "день", "дня", "дней", "day", "days")}. Today, maybe?")
+            lastDay == null -> tr("Я готов. Начнём, когда скажете.", "I'm ready. We start when you say.")
+            t - lastDay >= 4 -> tr("Последний раз мы тренировались ${count((t - lastDay).toInt(), "день", "дня", "дней", "day", "days")} назад. Соскучился!", "Our last workout was ${count((t - lastDay).toInt(), "день", "дня", "дней", "day", "days")} ago. I miss it!")
+            p.belly > 1 -> tr("Перевариваю ${fmt1(p.belly)}. В дни отдыха я расту.", "Digesting ${fmt1(p.belly)}. I grow on rest days.")
+            else -> tr("Отдохнули – можно и потренироваться.", "Rested – time to train.")
+        }
+    }
+    // a speech bubble hanging from the pet's picture above it
+    Box(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)).background(Color(p.sp().color).copy(alpha = .12f))
+        .padding(horizontal = 12.dp, vertical = 9.dp)) { Text(line, style = T.small.copy(color = C.ink)) }
+}
+
+/** The routine next in line, with its exercises as pictures and one button; hidden once today is done. */
+@Composable
+private fun TodayCard(d: Data, nav: Nav) {
+    if (d.live != null || d.routines.isEmpty() || d.finished.any { dayOf(it.start) == today() }) return
+    val c = LocalContext.current.container
+    val lastUse = remember(d.finished) { d.finished.filter { it.routineId > 0 }.groupBy { it.routineId }.mapValues { e -> e.value.maxOf { it.start } } }
+    val r = d.routines.minByOrNull { lastUse[it.id] ?: 0L } ?: return
+    val plans = remember(r.items) { app.pumpling.Plan.parse(r.items) }
+    val col = plans.groupBy { Catalog.of(it.exId).cat }.maxByOrNull { e -> e.value.sumOf { it.sets } }?.key?.let { Color(it.color) } ?: C.acc
+    Column(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(20.dp).clickable { nav.push(Screen.RoutineEdit(r.id)) }.padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(tr("На сегодня", "For today"), style = T.sec.copy(color = col))
+                Text(r.name, style = T.h3, maxLines = 1)
+                Text(count(plans.size, "упражнение", "упражнения", "упражнений", "exercise", "exercises") + " · " + count(plans.sumOf { it.sets }, "подход", "подхода", "подходов", "set", "sets"), style = T.small)
+            }
+            Box(Modifier.size(50.dp).clip(CircleShape).background(col).clickable { nav.askStart = r.id }, contentAlignment = Alignment.Center) { Icon(Icons.NEXT, Color.White, 24.dp) }
+        }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            plans.take(6).forEach { app.pumpling.ui.art.ExThumb(Catalog.of(it.exId), 42.dp) }
+            if (plans.size > 6) Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(C.card2), contentAlignment = Alignment.Center) { Text("+${plans.size - 6}", style = T.smallB) }
+        }
+    }
+}
+
+/** This month in three numbers. */
+@Composable
+private fun MonthRow(d: Data) {
+    if (d.finished.isEmpty()) return
+    val m0 = java.time.LocalDate.ofEpochDay(today()).withDayOfMonth(1).toEpochDay()
+    val ws = d.finished.filter { dayOf(it.start) >= m0 }
+    val st = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)) }
+    val tons = ws.sumOf { w -> d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }.sumOf { st.tonnageOf(it) } }
+    Text(java.time.LocalDate.ofEpochDay(today()).month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale(if (app.pumpling.domain.Lang.ru) "ru" else "en")).replaceFirstChar { it.uppercase() },
+        style = T.sec, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp))
+    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(Triple(Icons.GYM, C.acc, "${ws.size}" to count(ws.size, "тренировка", "тренировки", "тренировок", "workout", "workouts").substringAfter(' ')),
+            Triple(Icons.ARM, C.ok, app.pumpling.domain.tonnage(tons) to tr("поднято", "lifted")),
+            Triple(Icons.TROPHY, C.gold, "${ws.sumOf { it.prs }}" to tr("рекордов", "records"))).forEach { (ic, col, v) ->
+            Column(Modifier.weight(1f).fillMaxHeight().card(16.dp).padding(12.dp)) {
+                Icon(ic, col, 18.dp)
+                Text(v.first, style = T.h3, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
+                Text(v.second, style = T.tiny)
+            }
+        }
+    }
+}
+
+/** The last workout in one line, open on tap. */
+@Composable
+private fun LastCard(d: Data, nav: Nav) {
+    val w = d.finished.maxByOrNull { it.start } ?: return
+    val work = d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }
+    val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
+    val col = cats.firstOrNull()?.key?.let { Color(it.color) } ?: C.acc
+    Text(tr("Последняя тренировка", "Last workout"), style = T.sec, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp))
+    Row(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).clickable { nav.push(Screen.WorkoutView(w.id)) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        work.firstOrNull()?.let { app.pumpling.ui.art.ExThumb(Catalog.of(it.exId), 44.dp) }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.bodyB, maxLines = 1)
+            Text(relDay(dayOf(w.start)).replaceFirstChar { it.uppercase() } + " · " + app.pumpling.domain.span(w.end - w.start) + (if (w.prs > 0) " · " + count(w.prs, "рекорд", "рекорда", "рекордов", "record", "records") else ""), style = T.small, maxLines = 1)
+            if (cats.isNotEmpty()) Row(Modifier.padding(top = 6.dp).width(140.dp).height(4.dp).clip(RoundedCornerShape(50))) {
+                cats.forEach { (cc, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(cc.color))) } }
+        }
+        Icon(Icons.NEXT, C.mute, 18.dp)
     }
 }
