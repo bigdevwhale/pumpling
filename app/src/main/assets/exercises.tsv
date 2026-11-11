@@ -1,0 +1,141 @@
+# id	ru	en	kind	primary	secondary	equip	cat
+# kind: W weight×reps · B own weight reps (+ added weight) · A assisted (weight helps) · T hold, seconds · C cardio, minutes + km · M minutes
+squat	Приседания со штангой	Barbell back squat	W	quads,glutes	hams,lower,abs	bar	legs
+front_squat	Фронтальные приседания	Front squat	W	quads	glutes,abs,upper	bar	legs
+goblet_squat	Гоблет-приседания	Goblet squat	W	quads,glutes	abs	kb	legs
+hack_squat	Гакк-приседания	Hack squat	W	quads	glutes	mach	legs
+leg_press	Жим ногами	Leg press	W	quads,glutes	hams	mach	legs
+lunge	Выпады с гантелями	Dumbbell lunge	W	quads,glutes	hams	db	legs
+walking_lunge	Выпады в ходьбе	Walking lunge	W	quads,glutes	hams,calves	db	legs
+bulgarian	Болгарские выпады	Bulgarian split squat	W	quads,glutes	hams	db	legs
+step_up	Зашагивания на тумбу	Step-up	W	quads,glutes	calves	db	legs
+deadlift	Становая тяга	Deadlift	W	hams,glutes,lower	upper,fore,quads	bar	legs
+sumo_deadlift	Становая сумо	Sumo deadlift	W	glutes,quads	hams,lower	bar	legs
+rdl	Румынская тяга	Romanian deadlift	W	hams,glutes	lower	bar	legs
+db_rdl	Румынская тяга с гантелями	Dumbbell Romanian deadlift	W	hams,glutes	lower	db	legs
+hip_thrust	Ягодичный мост со штангой	Barbell hip thrust	W	glutes	hams	bar	legs
+glute_bridge	Ягодичный мостик	Glute bridge	B	glutes	hams	bw	legs
+leg_ext	Разгибание ног	Leg extension	W	quads		mach	legs
+leg_curl	Сгибание ног лёжа	Lying leg curl	W	hams		mach	legs
+seated_curl	Сгибание ног сидя	Seated leg curl	W	hams		mach	legs
+calf_raise	Подъём на носки стоя	Standing calf raise	W	calves		mach	legs
+seated_calf	Подъём на носки сидя	Seated calf raise	W	calves		mach	legs
+abductor	Отведение ног в тренажёре	Hip abduction	W	glutes		mach	legs
+adductor	Сведение ног в тренажёре	Hip adduction	W	quads		mach	legs
+air_squat	Приседания без веса	Air squat	B	quads,glutes		bw	legs
+pistol	Пистолетик	Pistol squat	B	quads,glutes	abs	bw	bal
+wall_sit	Стульчик у стены	Wall sit	T	quads	glutes	bw	legs
+good_morning	Наклоны со штангой	Good morning	W	hams,lower	glutes	bar	legs
+kb_swing	Махи гирей	Kettlebell swing	W	glutes,hams	lower,delts	kb	hiit
+bench	Жим штанги лёжа	Barbell bench press	W	chest	tri,delts	bar	push
+incline_bench	Жим на наклонной скамье	Incline bench press	W	chest,delts	tri	bar	push
+db_bench	Жим гантелей лёжа	Dumbbell bench press	W	chest	tri,delts	db	push
+incline_db	Жим гантелей на наклонной	Incline dumbbell press	W	chest,delts	tri	db	push
+close_grip	Жим узким хватом	Close-grip bench press	W	tri,chest	delts	bar	push
+chest_press	Жим в тренажёре	Machine chest press	W	chest	tri	mach	push
+fly	Разводка гантелей	Dumbbell fly	W	chest	delts	db	push
+cable_fly	Сведение в кроссовере	Cable crossover	W	chest		cable	push
+pec_deck	Бабочка	Pec deck	W	chest		mach	push
+pushup	Отжимания	Push-up	B	chest,tri	delts,abs	bw	push
+knee_pushup	Отжимания с колен	Knee push-up	B	chest,tri	delts	bw	push
+diamond_pushup	Алмазные отжимания	Diamond push-up	B	tri,chest		bw	push
+dip	Отжимания на брусьях	Dip	B	chest,tri	delts	bw	push
+assisted_dip	Брусья в гравитроне	Assisted dip	A	chest,tri	delts	mach	push
+ohp	Жим штанги стоя	Overhead press	W	delts	tri,abs	bar	push
+db_ohp	Жим гантелей сидя	Seated dumbbell press	W	delts	tri	db	push
+arnold	Жим Арнольда	Arnold press	W	delts	tri	db	push
+lateral	Махи в стороны	Lateral raise	W	delts		db	push
+front_raise	Подъём гантелей перед собой	Front raise	W	delts		db	push
+rear_delt	Разводка в наклоне	Rear delt fly	W	delts	upper	db	pull
+face_pull	Тяга к лицу	Face pull	W	delts,upper		cable	pull
+pike_pushup	Отжимания уголком	Pike push-up	B	delts	tri	bw	push
+handstand_pushup	Отжимания в стойке на руках	Handstand push-up	B	delts,tri		bw	bal
+pushdown	Разгибания на блоке	Triceps pushdown	W	tri		cable	push
+skullcrusher	Французский жим	Skull crusher	W	tri		ez	push
+oh_ext	Разгибание из-за головы	Overhead triceps extension	W	tri		db	push
+bench_dip	Обратные отжимания от скамьи	Bench dip	B	tri	chest	bw	push
+pullup	Подтягивания	Pull-up	B	lats	bi,upper	bw	pull
+chinup	Подтягивания обратным хватом	Chin-up	B	lats,bi	upper	bw	pull
+assisted_pullup	Подтягивания в гравитроне	Assisted pull-up	A	lats	bi	mach	pull
+negative_pullup	Негативные подтягивания	Negative pull-up	B	lats	bi	bw	pull
+lat_pulldown	Тяга верхнего блока	Lat pulldown	W	lats	bi	cable	pull
+row	Тяга штанги в наклоне	Barbell row	W	upper,lats	bi,lower	bar	pull
+db_row	Тяга гантели одной рукой	One-arm dumbbell row	W	lats,upper	bi	db	pull
+cable_row	Тяга нижнего блока	Seated cable row	W	upper,lats	bi	cable	pull
+tbar_row	Тяга Т-грифа	T-bar row	W	upper,lats	bi	bar	pull
+inverted_row	Австралийские подтягивания	Inverted row	B	upper,lats	bi	bw	pull
+pullover	Пуловер	Pullover	W	lats	chest	db	pull
+shrug	Шраги	Shrug	W	upper	fore	db	pull
+hyperext	Гиперэкстензия	Back extension	B	lower	glutes,hams	bw	core
+curl	Сгибания со штангой	Barbell curl	W	bi	fore	bar	pull
+db_curl	Сгибания с гантелями	Dumbbell curl	W	bi	fore	db	pull
+hammer	Молотки	Hammer curl	W	bi,fore		db	pull
+preacher	Сгибания на скамье Скотта	Preacher curl	W	bi		ez	pull
+cable_curl	Сгибания на блоке	Cable curl	W	bi		cable	pull
+wrist_curl	Сгибания запястий	Wrist curl	W	fore		db	pull
+farmer	Прогулка фермера	Farmer's walk	T	fore,upper	abs,calves	db	core
+dead_hang	Вис на турнике	Dead hang	T	fore,lats		bw	pull
+plank	Планка	Plank	T	abs	delts	bw	core
+side_plank	Боковая планка	Side plank	T	abs		bw	core
+hollow	Лодочка	Hollow hold	T	abs		bw	core
+lsit	Уголок	L-sit	T	abs	tri	bw	core
+crunch	Скручивания	Crunch	B	abs		bw	core
+leg_raise	Подъём ног в висе	Hanging leg raise	B	abs	fore	bw	core
+lying_leg_raise	Подъём ног лёжа	Lying leg raise	B	abs		bw	core
+russian_twist	Русский твист	Russian twist	B	abs		bw	core
+cable_crunch	Скручивания на блоке	Cable crunch	W	abs		cable	core
+ab_wheel	Ролик для пресса	Ab wheel rollout	B	abs	lats	other	core
+dead_bug	Мёртвый жук	Dead bug	B	abs		bw	core
+bird_dog	Птица-собака	Bird dog	B	lower,abs	glutes	bw	bal
+pallof	Жим Паллофа	Pallof press	W	abs		cable	core
+mountain	Скалолаз	Mountain climber	B	abs	quads,delts	bw	hiit
+burpee	Бёрпи	Burpee	B	quads,chest	abs,delts	bw	hiit
+jumping_jack	Прыжки «звёздочка»	Jumping jack	B	calves	delts	bw	hiit
+box_jump	Прыжки на тумбу	Box jump	B	quads,glutes	calves	other	jump
+jump_squat	Выпрыгивания из приседа	Jump squat	B	quads,glutes	calves	bw	jump
+broad_jump	Прыжки в длину с места	Broad jump	B	quads,glutes	calves	bw	jump
+jump_rope	Скакалка	Jump rope	M	calves	delts	other	jump
+skater	Прыжки конькобежца	Skater jump	B	glutes,quads		bw	jump
+clap_pushup	Отжимания с хлопком	Clap push-up	B	chest,tri		bw	jump
+power_clean	Взятие на грудь	Power clean	W	hams,glutes,upper	quads,delts	bar	jump
+thruster	Трастеры	Thruster	W	quads,delts	glutes,tri	bar	hiit
+wall_ball	Броски мяча в стену	Wall ball	W	quads,delts	glutes	other	hiit
+battle_rope	Канаты	Battle ropes	M	delts	abs,fore	other	hiit
+tabata	Табата	Tabata	M	quads	abs	bw	hiit
+hiit	Интервальная тренировка	HIIT session	M	quads	abs,delts	bw	hiit
+circuit	Круговая тренировка	Circuit training	M	quads	chest,abs	other	hiit
+boxing	Бокс, работа на мешке	Bag work	M	delts	abs,fore	other	jump
+shadow_box	Бой с тенью	Shadow boxing	M	delts	abs	bw	jump
+run	Бег	Running	C	quads,calves	hams,glutes	cardio	cardio
+treadmill	Беговая дорожка	Treadmill run	C	quads,calves	hams	cardio	cardio
+trail_run	Бег по пересечённой	Trail run	C	quads,calves	glutes	cardio	cardio
+walk	Ходьба	Walking	C	calves	quads	cardio	cardio
+hike	Поход	Hike	C	quads,calves	glutes	cardio	cardio
+incline_walk	Ходьба в горку на дорожке	Incline walk	C	glutes,calves	quads	cardio	cardio
+bike	Велосипед	Cycling	C	quads	hams,calves	cardio	cardio
+spin	Велотренажёр	Stationary bike	C	quads	hams	cardio	cardio
+rower	Гребной тренажёр	Rowing machine	C	upper,lats	quads,bi	cardio	cardio
+elliptical	Эллипс	Elliptical	C	quads	glutes	cardio	cardio
+stairs	Степпер	Stair climber	C	glutes,quads	calves	cardio	cardio
+swim	Плавание	Swimming	C	lats,delts	abs	cardio	cardio
+ski	Беговые лыжи	Cross-country skiing	C	quads,lats	delts	cardio	cardio
+skate	Коньки	Skating	C	quads,glutes	calves	cardio	cardio
+nordic	Скандинавская ходьба	Nordic walking	C	calves,quads	lats	cardio	cardio
+yoga	Йога	Yoga	M	abs	hams,delts	bw	flex
+stretch	Растяжка	Stretching	M	hams	quads	bw	flex
+mobility	Мобилити	Mobility	M	glutes	delts	bw	flex
+pilates	Пилатес	Pilates	M	abs	glutes	bw	flex
+foam_roll	Ролл-массаж	Foam rolling	M	quads	lats	other	flex
+splits	Шпагат	Splits	T	hams	quads	bw	flex
+bridge_hold	Мостик	Back bridge	T	lower	delts	bw	flex
+tree_pose	Поза дерева	Tree pose	T	calves	abs	bw	bal
+single_leg_rdl	Румынская тяга на одной ноге	Single-leg RDL	W	hams,glutes	abs	db	bal
+bosu	Баланс на босу	BOSU balance	M	calves	abs	other	bal
+handstand	Стойка на руках	Handstand hold	T	delts	abs	bw	bal
+crow	Поза ворона	Crow pose	T	abs	tri	bw	bal
+football	Футбол	Football	M	quads	calves	other	cardio
+basketball	Баскетбол	Basketball	M	quads	calves	other	jump
+tennis	Теннис	Tennis	M	delts	quads	other	cardio
+climbing	Скалолазание	Climbing	M	lats,fore	bi	other	pull
+dance	Танцы	Dancing	M	calves	glutes	other	cardio
+martial	Единоборства	Martial arts	M	delts	abs	other	jump
