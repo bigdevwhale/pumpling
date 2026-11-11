@@ -408,6 +408,22 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
                     Column { Text(v, style = T.num.copy(color = Color.White)); Text(l, style = T.tiny.copy(color = Color(0xCCFFFFFF))) } }
             }
             if (plans.isNotEmpty()) app.pumpling.ui.components.Stripe(planParts(plans).map { (cc, n) -> cc to n }, Modifier.padding(top = 12.dp))
+            val done = if (old == null) emptyList() else d.finished.filter { it.routineId == old.id }.sortedByDescending { it.start }
+            if (done.isNotEmpty()) Row(Modifier.padding(top = 12.dp).clip(RoundedCornerShape(50)).background(Color(0x26FFFFFF)).padding(horizontal = 12.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.CAL, Color.White, 15.dp)
+                Text("  " + tr("Делали ${done.size} раз · последний ${fmtDayShort(dayOf(done[0].start))}", "Done ${done.size} times · last ${fmtDayShort(dayOf(done[0].start))}"), style = T.small.copy(color = Color.White))
+            }
+        }
+        // what the whole plan works, on one body
+        if (plans.isNotEmpty()) {
+            val prim = plans.flatMap { Catalog.of(it.exId).primary }.distinct()
+            val sec = plans.flatMap { Catalog.of(it.exId).secondary }.distinct() - prim.toSet()
+            Section(icon = Icons.ARM, text = tr("Что тренирует", "What it works"))
+            Column(Modifier.fillMaxWidth().card(20.dp).padding(14.dp)) {
+                app.pumpling.ui.components.TargetMap(prim, sec, h = 190.dp)
+                Text(tr("Основные: ", "Main: ") + prim.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ink), modifier = Modifier.padding(top = 8.dp))
+                if (sec.isNotEmpty()) Text(tr("Помогают: ", "Helping: ") + sec.joinToString(", ") { it.label.lowercase() }, style = T.small)
+            }
         }
         Section(icon = Icons.GYM, text = tr("Упражнения", "Exercises"))
         app.pumpling.ui.components.Hint("routine-edit", d.s.seen, Icons.LIST, tr("Как собрать программу", "Building a routine"), tr("Добавьте упражнения и задайте подходы и повторы. Стрелкой меняется порядок. Когда начнёте программу, всё подставится само, а веса возьмутся из прошлого раза.",
@@ -421,10 +437,14 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
                 app.pumpling.ui.art.ExThumb(ex, 48.dp)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text("${i + 1}. " + ex.name, style = T.bodyB, maxLines = 2); Text(ex.cat.label, style = T.tiny.copy(color = ec)) }
+                        Column(Modifier.weight(1f)) { Text("${i + 1}. " + ex.name, style = T.bodyB, maxLines = 2)
+                            Text((listOf(ex.cat.label) + ex.primary.take(2).map { it.label.lowercase() }).joinToString(" · "), style = T.tiny.copy(color = ec), maxLines = 1) }
                         if (i > 0) Box(Modifier.size(36.dp).clip(CircleShape).clickable { val t = plans[i - 1]; plans[i - 1] = p; plans[i] = t }, contentAlignment = Alignment.Center) { Icon(Icons.UP, C.mute, 18.dp) }
                         Box(Modifier.size(36.dp).clip(CircleShape).clickable { plans.removeAt(i) }, contentAlignment = Alignment.Center) { Icon(Icons.CLOSE, C.mute, 18.dp) }
                     }
+                    val last = remember(d.doneSets, p.exId) { d.doneSets.filter { it.exId == p.exId && !it.warmup }.groupBy { it.workoutId }.maxByOrNull { e -> e.value.maxOf { it.doneAt } }?.value?.sortedBy { it.idx } }
+                    if (last != null) Text(tr("В прошлый раз: ", "Last time: ") + last.take(4).joinToString(", ") { app.pumpling.domain.setLine(ex, it).removePrefix("× ") } + (if (last.size > 4) " …" else ""),
+                        style = T.tiny.copy(color = C.ink), maxLines = 1, modifier = Modifier.padding(top = 4.dp))
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Stepper(tr("подходы", "sets"), "${p.sets}") { plans[i] = p.copy(sets = (p.sets + it).coerceIn(1, 12)) }
                         when (ex.kind) {
@@ -440,6 +460,9 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
             .padding(14.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.PLUS, C.acc, 20.dp); Text("  " + tr("Добавить упражнения", "Add exercises"), style = T.btn.copy(color = C.acc)) }
         Spacer(Modifier.height(18.dp))
+        if (old != null) { Btn(tr("Начать тренировку", "Start workout"), Modifier.fillMaxWidth(), color = C.ok) {
+            if (d.live == null) nav.askStart = old.id else { c.say(tr("Сначала закончите текущую тренировку", "Finish the current workout first")); nav.push(Screen.Live) } }
+            Spacer(Modifier.height(10.dp)) }
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), enabled = name.isNotBlank() && plans.isNotEmpty()) {
             c.write { if (old == null) dao.insert(Routine(name = name.trim(), items = Plan.join(plans), created = System.currentTimeMillis(), order = d.routines.size))
                 else dao.update(old.copy(name = name.trim(), items = Plan.join(plans))) }
