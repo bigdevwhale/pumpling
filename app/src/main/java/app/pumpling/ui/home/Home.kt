@@ -101,8 +101,6 @@ fun HomeScreen(d: Data, nav: Nav) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             TodayCard(d, nav)
             StatusCard(d, nav)
-            MonthRow(d)
-            LastCard(d, nav)
             CheckInCard(d, nav)
             QuestFold(d)
             FreshFold(d)
@@ -274,45 +272,3 @@ private fun TodayCard(d: Data, nav: Nav) {
     }
 }
 
-/** This month in three numbers. */
-@Composable
-private fun MonthRow(d: Data) {
-    if (d.finished.isEmpty()) return
-    val m0 = java.time.LocalDate.ofEpochDay(today()).withDayOfMonth(1).toEpochDay()
-    val ws = d.finished.filter { dayOf(it.start) >= m0 }
-    val st = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)) }
-    val tons = ws.sumOf { w -> d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }.sumOf { st.tonnageOf(it) } }
-    Text(java.time.LocalDate.ofEpochDay(today()).month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale(if (app.pumpling.domain.Lang.ru) "ru" else "en")).replaceFirstChar { it.uppercase() },
-        style = T.sec, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp))
-    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(Triple(Icons.GYM, C.acc, "${ws.size}" to count(ws.size, "тренировка", "тренировки", "тренировок", "workout", "workouts").substringAfter(' ')),
-            Triple(Icons.ARM, C.ok, app.pumpling.domain.tonnage(tons) to tr("поднято", "lifted")),
-            Triple(Icons.TROPHY, C.gold, "${ws.sumOf { it.prs }}" to tr("рекордов", "records"))).forEach { (ic, col, v) ->
-            Column(Modifier.weight(1f).fillMaxHeight().card(16.dp).padding(12.dp)) {
-                Icon(ic, col, 18.dp)
-                Text(v.first, style = T.h3, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
-                Text(v.second, style = T.tiny)
-            }
-        }
-    }
-}
-
-/** The last workout in one line, open on tap. */
-@Composable
-private fun LastCard(d: Data, nav: Nav) {
-    val w = d.finished.maxByOrNull { it.start } ?: return
-    val work = d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }
-    val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
-    val col = cats.firstOrNull()?.key?.let { Color(it.color) } ?: C.acc
-    Text(tr("Последняя тренировка", "Last workout"), style = T.sec, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp))
-    Row(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).clickable { nav.push(Screen.WorkoutView(w.id)) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        work.firstOrNull()?.let { app.pumpling.ui.art.ExThumb(Catalog.of(it.exId), 44.dp) }
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.bodyB, maxLines = 1)
-            Text(relDay(dayOf(w.start)).replaceFirstChar { it.uppercase() } + " · " + app.pumpling.domain.span(w.end - w.start) + (if (w.prs > 0) " · " + count(w.prs, "рекорд", "рекорда", "рекордов", "record", "records") else ""), style = T.small, maxLines = 1)
-            if (cats.isNotEmpty()) Row(Modifier.padding(top = 6.dp).width(140.dp).height(4.dp).clip(RoundedCornerShape(50))) {
-                cats.forEach { (cc, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(cc.color))) } }
-        }
-        Icon(Icons.NEXT, C.mute, 18.dp)
-    }
-}
