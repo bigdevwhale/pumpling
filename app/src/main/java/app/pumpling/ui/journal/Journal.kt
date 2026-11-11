@@ -124,17 +124,27 @@ private fun History(d: Data, nav: Nav) {
         byWeek.forEach { (mon, ws) ->
             item(key = "w$mon") {
                 val work = ws.flatMap { w -> d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup } }
-                Row(Modifier.padding(top = 18.dp, bottom = 8.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.Bottom) {
-                    Text(if (mon == weekStart(today())) tr("Эта неделя", "This week") else if (mon == weekStart(today()) - 7) tr("Прошлая неделя", "Last week")
-                        else "${fmtDayShort(mon)} – ${fmtDayShort(mon + 6)}", style = T.h3, modifier = Modifier.weight(1f))
-                    Text(listOfNotNull(count(ws.size, "тренировка", "тренировки", "тренировок", "workout", "workouts"), work.sumOf { st.tonnageOf(it) }.takeIf { it > 0 }?.let { tonnage(it) }).joinToString(" · "), style = T.small)
+                val days = ws.map { dayOf(it.start) }.toSet(); val met = days.size >= d.s.weekGoal
+                Column(Modifier.padding(top = 20.dp, bottom = 8.dp, start = 4.dp, end = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (mon == weekStart(today())) tr("Эта неделя", "This week") else if (mon == weekStart(today()) - 7) tr("Прошлая неделя", "Last week")
+                            else "${fmtDayShort(mon)} – ${fmtDayShort(mon + 6)}", style = T.h3, modifier = Modifier.weight(1f))
+                        if (met) Row(Modifier.clip(RoundedCornerShape(50)).background(C.ok.copy(alpha = .14f)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.CHECK, C.ok, 13.dp); Text(" " + tr("цель", "goal"), style = T.tiny.copy(color = C.ok)) }
+                    }
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        (0..6).forEach { i -> val day = mon + i; val w = ws.firstOrNull { dayOf(it.start) == day }
+                            val col = w?.let { x -> d.setsBy[x.id].orEmpty().filter { it.done }.groupingBy { Catalog.of(it.exId).cat }.eachCount().maxByOrNull { it.value }?.key?.let { Color(it.color) } ?: C.acc }
+                            Box(Modifier.padding(end = 4.dp).size(width = 18.dp, height = 6.dp).clip(RoundedCornerShape(50)).background(col ?: C.track)) }
+                        Text("  " + listOfNotNull(count(ws.size, "тренировка", "тренировки", "тренировок", "workout", "workouts"), work.sumOf { st.tonnageOf(it) }.takeIf { it > 0 }?.let { tonnage(it) }).joinToString(" · "), style = T.small)
+                    }
                 }
             }
             item(key = "c$mon") {
                 // a week is one card, its workouts quiet rows inside it
                 Column(Modifier.fillMaxWidth().card(18.dp)) {
                     ws.forEachIndexed { i, w ->
-                        if (i > 0) Box(Modifier.padding(start = 66.dp).fillMaxWidth().height(1.dp).background(C.line))
+                        if (i > 0) Box(Modifier.padding(start = 70.dp).fillMaxWidth().height(1.dp).background(C.line))
                         HistoryRow(w, d, st) { nav.push(Screen.WorkoutView(w.id)) }
                     }
                 }
@@ -478,9 +488,11 @@ private fun HistoryRow(w: Workout, d: Data, st: Stats, onClick: () -> Unit) {
     val day = java.time.LocalDate.ofEpochDay(dayOf(w.start))
     val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
     val main = cats.firstOrNull()?.key
+    val ctx = LocalContext.current
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.width(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("${day.dayOfMonth}", style = T.h3.copy(color = main?.let { Color(it.color) } ?: C.ink))
+        Column(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(main?.let { Color(it.color).copy(alpha = .14f) } ?: C.card2),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text("${day.dayOfMonth}", style = T.bodyB.copy(color = main?.let { Color(it.color) } ?: C.ink))
             Text(app.pumpling.domain.dayShort(day.dayOfWeek.value - 1), style = T.tiny)
         }
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
@@ -492,8 +504,12 @@ private fun HistoryRow(w: Workout, d: Data, st: Stats, onClick: () -> Unit) {
             if (cats.isNotEmpty()) Row(Modifier.padding(top = 6.dp).width(150.dp).height(4.dp).clip(RoundedCornerShape(50))) {
                 cats.forEach { (c, n) -> Box(Modifier.weight(n.toFloat()).fillMaxHeight().background(Color(c.color))) } }
         }
-        if (w.prs > 0) Row(Modifier.padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.TROPHY, C.gold, 15.dp); Text(" ${w.prs}", style = T.smallB.copy(color = C.gold)) }
+        // who led that day, with its records pinned on
+        Box(Modifier.padding(start = 8.dp).size(48.dp)) {
+            Art.pet(ctx, w.leader.ifEmpty { "bull" }, 2)?.let { androidx.compose.foundation.Image(it, null, Modifier.size(42.dp).align(Alignment.Center)) }
+            if (w.prs > 0) Row(Modifier.align(Alignment.BottomEnd).clip(RoundedCornerShape(50)).background(C.gold).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.TROPHY, Color.White, 10.dp); Text("${w.prs}", style = T.tiny.copy(color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)) }
+        }
     }
 }
 
