@@ -16,7 +16,7 @@ Log your sets, weights and cardio, and your team in a small basement gym does th
 ## What's inside
 
 - **Workouts.** Sets for any exercise: weight and reps, bodyweight, assisted, holds, cardio with distance, or just minutes. Last time's sets and a nudge to beat them; a star tells you a set will be a record. A rest timer in the notification and a plate calculator.
-- **140 exercises and your own.** Search and filter by family and equipment. Add your own exercise in a minute and pick its muscles on a body map; add your own equipment too.
+- **275 exercises and your own,** each with a picture and its target muscles. Search knows other names; filter by family and equipment. Add your own exercise in a minute and pick its muscles on a body map; add your own equipment too.
 - **33 ready routines** for the gym, home and outdoors, from beginner to advanced: full body, splits, single muscle groups, running, stretching. Look inside before you take one. Build your own in a few taps or save any workout as a routine.
 - **Twenty pets** with abilities: the bullock loves legs, the otter cardio, the octopus pulls, the owl evening workouts, the phoenix a comeback. Three on the team, and their abilities add up. A grown pet takes a build from what it was raised on.
 - **A gym with a window** that shows the time of day and the weather in your town. Plates from workouts, records and weekly quests furnish it.

@@ -6,6 +6,23 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.1.0] - 2026-11-11
+
+- 275 exercises instead of 140, each with a picture of a pet doing it; search understands other names and gym slang («разведение ног», «гравитрон»).
+- Target muscles everywhere: tap any exercise picture – in a workout, a routine, a ready routine, the picker – for a card with the muscle map, how to log it and your best.
+- Routines show what they work on one body, last time's sets for each exercise, how often you've done them, and a start button.
+- A past workout reads like a story: the leading pet, plates and food earned, records in gold, the muscles worked, sets as chips.
+- The journal: weeks as single cards with a day strip and a goal mark, older weeks folded, this month in three numbers.
+- The gym: your leading pet comments on how training goes, and the next routine waits under «На сегодня»; recovery is always at hand.
+- A new pet page: name and badges under the picture, poses, numbers, traits, what it ate, its place on the team.
+- Fixed: eggs found while finishing a workout are dated by that workout.
+
+<!-- tg
+Pumpling 1.1.0: упражнений стало 275, и у каждого есть картинка. Поиск понимает другие названия, например «разведение ног» или «гравитрон».
+Нажмите на картинку упражнения в любом месте, и откроется карточка с целевыми мышцами. В программах видно, что они тренируют, и что вы делали в прошлый раз.
+Обновили журнал, страницы тренировки и питомца. В зале ведущий питомец подсказывает, как идут дела, а следующая программа ждёт в «На сегодня».
+-->
+
 ## [1.0.0] - 2026-11-11
 
 The first release of Pumpling.
