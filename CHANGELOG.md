@@ -6,6 +6,21 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.2.0] - 2026-11-12
+
+- How to do each exercise: every one of the 275 has a short description of the technique, on its page and on its card.
+- Edit a past workout: change sets and exercises, the name, the note, the day, the start and how long it took. Records are worked out again; what the pets ate stays.
+- Left and right apart: one-arm and one-leg exercises can be logged as L/R pairs; the next time and routines keep the pairs.
+- Recovery on the gym screen shows resting and ready muscles together on one figure, with both lists under it.
+- Fixed: «How to log it» gave pull-ups as the example for every bodyweight exercise; now the example names the exercise itself.
+
+<!-- tg
+Pumpling 1.2.0: у каждого упражнения появилось описание, как его выполнять. Оно есть на странице упражнения и в его карточке.
+Прошедшую тренировку теперь можно изменить: подходы, упражнения, название, дату и длительность. Упражнения на одну руку или ногу можно записывать отдельно для левой и правой стороны.
+В восстановлении уставшие и отдохнувшие мышцы показаны на одной схеме, а списки под ней.
+Исправили подсказку «Как записывать»: раньше там у всех упражнений были подтягивания.
+-->
+
 ## [1.1.0] - 2026-11-11
 
 - 275 exercises instead of 140, each with a picture of a pet doing it; search understands other names and gym slang («разведение ног», «гравитрон»).
