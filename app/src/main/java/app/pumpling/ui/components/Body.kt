@@ -104,6 +104,17 @@ fun BodyMap(v: Map<Muscle, Double>, modifier: Modifier = Modifier, color: Color 
     Column(modifier) { Figure(h) { m -> val t = (v[m] ?: 0.0).toFloat().coerceIn(0f, 1f); if (t <= .02f) rest else lerp(low, color, .3f + .7f * t) } }
 }
 
+/**
+ * Recovery on one figure: muscles still resting in [tired], brighter the more tired they are,
+ * and the rested ones in [fresh]. [isTired] decides which group a muscle is in.
+ */
+@Composable
+fun RecoveryMap(v: Map<Muscle, Double>, isTired: (Muscle) -> Boolean, modifier: Modifier = Modifier, tired: Color = C.acc, fresh: Color = C.ok, h: Dp = 220.dp) {
+    val rest = lerp(C.card, C.mute, if (C.dark) .6f else .45f)
+    val freshCol = lerp(rest, fresh, .7f)
+    Column(modifier) { Figure(h) { m -> if (isTired(m)) lerp(lerp(rest, tired, .45f), tired, (v[m] ?: 0.0).toFloat().coerceIn(0f, 1f)) else freshCol } }
+}
+
 val PRIMARY = Color(0xFFE0533A)
 val SECONDARY = Color(0xFF6E9FE0)
 

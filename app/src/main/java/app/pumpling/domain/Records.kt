@@ -111,7 +111,10 @@ object Records {
 }
 
 /** Short words for a set: «60 × 8», «−20 × 6», «1:30», «5 км · 27:10». */
-fun setLine(ex: Ex, s: WSet): String = when (ex.kind) {
+/** «Л» or «П» before a one-sided set, nothing for both sides. */
+fun sideMark(side: Int) = when (side) { 1 -> tr("Л", "L"); 2 -> tr("П", "R"); else -> "" }
+
+fun setLine(ex: Ex, s: WSet): String = sideMark(s.side).let { if (it.isEmpty()) "" else "$it " } + when (ex.kind) {
     Kind.WEIGHT -> "${w(s.weight)} × ${s.reps}"
     Kind.BODY -> if (s.weight > 0) "+${w(s.weight)} × ${s.reps}" else "× ${s.reps}"
     Kind.ASSIST -> "−${w(s.weight)} × ${s.reps}"

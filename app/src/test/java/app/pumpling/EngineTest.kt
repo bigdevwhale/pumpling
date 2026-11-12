@@ -84,4 +84,23 @@ class EngineTest {
         assertTrue(all.filter { it.matches("жим леж") }.any { it.id == "bench" })
         assertTrue(all.size >= 270)
     }
+
+    @Test fun everyExerciseHasHowTo() {
+        Catalog.loadHow(File("src/main/assets/howto.tsv").readLines())
+        val missing = Catalog.all().filter { it.how.isBlank() }.map { it.id }
+        assertTrue("no how-to for $missing", missing.isEmpty())
+    }
+
+    @Test fun logHelpNamesTheExercise() {
+        val ex = Catalog.of("mountain")
+        val help = ex.kind.help(ex)
+        assertTrue(help, help.contains(ex.name))
+        assertTrue(help, !help.contains("одтягиван") && !help.contains("ull-up"))
+    }
+
+    @Test fun oneSidedSetsAreMarked() {
+        val ex = Catalog.of("squat")
+        assertTrue(app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8).copy(side = 1)).startsWith(app.pumpling.domain.sideMark(1)))
+        assertEquals(app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8)), app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8).copy(side = 0)))
+    }
 }

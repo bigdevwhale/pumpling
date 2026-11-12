@@ -238,6 +238,7 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
     val sets = d.setsBy[w.id].orEmpty().filter { it.done }
     var askDelete by remember { mutableStateOf(false) }
     Page(w.title.ifEmpty { tr("Тренировка", "Workout") }, { nav.pop() }, action = {
+        Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.push(Screen.Edit(w.id)) }, contentAlignment = Alignment.Center) { Icon(Icons.EDIT, C.ink, 22.dp) }
         Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.share = ShareReq(CardKind.WORKOUT, w.id) }, contentAlignment = Alignment.Center) { Icon(Icons.SHARE, C.ink, 22.dp) } }) {
         val work = sets.filter { !it.warmup }
         val cats = work.groupingBy { Catalog.of(it.exId).cat }.eachCount().entries.sortedByDescending { it.value }
@@ -322,8 +323,10 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
             c.write { val nid = start(null); dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }; sets.map { it.exId }.distinct().forEach { addExercise(nid, it) } }
             nav.pop(); nav.push(Screen.Live) }
         Spacer(Modifier.height(8.dp))
+        Ghost(tr("Изменить тренировку", "Edit the workout"), Modifier.fillMaxWidth()) { nav.push(Screen.Edit(w.id)) }
+        Spacer(Modifier.height(8.dp))
         Ghost(tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
-            val plans = sets.filter { !it.warmup }.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.size, l.first().reps, l.first().weight, l.first().secs) }
+            val plans = sets.filter { !it.warmup }.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs) }
             c.write { dao.insert(Routine(name = w.title.ifEmpty { tr("Программа", "Routine") }, items = Plan.join(plans), created = System.currentTimeMillis())); say(tr("Программа сохранена", "Routine saved")) } }
         Spacer(Modifier.height(8.dp))
         Ghost(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { askDelete = true }

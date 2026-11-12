@@ -15,20 +15,26 @@ enum class Kind(val code: Char) {
         HOLD -> tr("Удержание, время", "Hold, time"); CARDIO -> tr("Кардио: время и дистанция", "Cardio: time and distance"); MINUTES -> tr("Только минуты", "Minutes only")
     }
     val timed get() = this == HOLD || this == CARDIO || this == MINUTES
-    /** How a set of this kind is written, with an example. */
-    val help: String get() = when (this) {
-        WEIGHT -> tr("Пишете вес снаряда и сколько раз подняли: 60 кг × 8. Для штанги, гантелей, гирь и тренажёров.",
-            "Write the weight and how many times you lifted it: 60 kg × 8. For barbells, dumbbells, kettlebells and machines.")
-        BODY -> tr("Только повторы: подтягивания × 10. Поле веса оставьте пустым. Если вешаете блин на пояс – впишите его вес, он прибавится к вашему.",
-            "Just the reps: pull-ups × 10. Leave the weight empty. With a plate on a belt, write its weight – it adds to yours.")
-        ASSIST -> tr("Гравитрон или резинка помогают подтянуться. Пишете, сколько килограммов помощи выставили, и повторы: помощь 20 кг × 8. Чем меньше помощь, тем вы сильнее – когда она уменьшится, будет рекорд.",
-            "An assisted machine or band helps you up. Write how many kilos of help you set and the reps: help 20 kg × 8. Less help means stronger – when it drops, that's a record.")
-        HOLD -> tr("Сколько секунд держали: планка 60 с. Если держите груз (прогулка фермера) – впишите и вес.",
-            "How many seconds you held: a plank, 60 s. If you hold a load (a farmer's walk), add the weight too.")
-        CARDIO -> tr("Километры и минуты: бег 5 км за 30 мин. Темп и лучшее время посчитаются сами. Если дистанции нет – только минуты.",
-            "Kilometres and minutes: a 5 km run in 30 min. Pace and best times are worked out for you. No distance? Just minutes.")
-        MINUTES -> tr("Только время: йога 30 мин, футбол 60 мин. Подходит для занятий, где подходов нет.",
-            "Just the time: yoga 30 min, football 60 min. For activities without sets.")
+    /**
+     * How a set of this kind is written, with an example. The example names [ex] when given,
+     * so a mountain climber's card doesn't talk about pull-ups.
+     */
+    fun help(ex: Ex? = null): String {
+        val n = ex?.name?.let { "«$it»" }
+        return when (this) {
+            WEIGHT -> tr("Пишете вес снаряда и сколько раз подняли: ${n ?: "жим"} 60 кг × 8. Для штанги, гантелей, гирь и тренажёров.",
+                "Write the weight and how many times you lifted it: ${n ?: "a press"} 60 kg × 8. For barbells, dumbbells, kettlebells and machines.")
+            BODY -> tr("Только повторы: ${n ?: "отжимания"} × 10. Поле веса оставьте пустым. Если добавляете груз (блин на поясе, жилет) – впишите его вес, он прибавится к вашему.",
+                "Just the reps: ${n ?: "push-ups"} × 10. Leave the weight empty. With an added load (a plate on a belt, a vest), write its weight – it adds to yours.")
+            ASSIST -> tr("Гравитрон или резинка помогают. Пишете, сколько килограммов помощи выставили, и повторы: ${n ?: "подтягивания"}, помощь 20 кг × 8. Чем меньше помощь, тем вы сильнее – когда она уменьшится, будет рекорд.",
+                "An assisted machine or band helps you. Write how many kilos of help you set and the reps: ${n ?: "pull-ups"}, help 20 kg × 8. Less help means stronger – when it drops, that's a record.")
+            HOLD -> tr("Сколько секунд продержались: ${n ?: "планка"} 60 с. Если держите груз – впишите и вес.",
+                "How many seconds you held: ${n ?: "a plank"}, 60 s. If you hold a load, add the weight too.")
+            CARDIO -> tr("Километры и минуты: ${n ?: "бег"} 5 км за 30 мин. Темп и лучшее время посчитаются сами. Если дистанции нет – только минуты.",
+                "Kilometres and minutes: ${n ?: "a run"}, 5 km in 30 min. Pace and best times are worked out for you. No distance? Just minutes.")
+            MINUTES -> tr("Только время: ${n ?: "йога"} 30 мин. Подходит для занятий, где подходов нет.",
+                "Just the time: ${n ?: "yoga"}, 30 min. For activities without sets.")
+        }
     }
     companion object { fun of(c: Char) = entries.firstOrNull { it.code == c } ?: WEIGHT }
 }
@@ -81,6 +87,8 @@ data class Ex(
     }
     /** «Подтягивания», «отжимания» and the like count your own weight into the tonnage. */
     val bodyweight get() = kind == Kind.BODY || kind == Kind.ASSIST
+    /** How to do it, in a few sentences; empty for the user's own exercises. */
+    val how: String get() = Catalog.how(id)
 }
 
 object Catalog {
@@ -92,7 +100,14 @@ object Catalog {
             val c = line.split('\t')
             fun ms(s: String) = s.split(',').mapNotNull { Muscle.of(it.trim()) }
             Ex(c[0], c[1], c[2], Kind.of(c[3][0]), ms(c[4]), ms(c.getOrElse(5) { "" }), Equip.of(c.getOrElse(6) { "" }), Cat.of(c.getOrElse(7) { "" }), aliases = c.getOrElse(8) { "" })
-        }.also { builtin = it }
+        }.also { builtin = it; runCatching { loadHow(ctx.assets.open("howto.tsv").bufferedReader().readLines()) } }
+    }
+
+    /** How each built-in exercise is done: id → (ru, en), from assets/howto.tsv. */
+    @Volatile private var howTo: Map<String, Pair<String, String>> = emptyMap()
+    fun how(id: String): String = howTo[id]?.let { tr(it.first, it.second) }.orEmpty()
+    fun loadHow(lines: List<String>) {
+        howTo = lines.filter { it.isNotBlank() && !it.startsWith("#") }.mapNotNull { val c = it.split('	'); if (c.size >= 3) c[0] to (c[1] to c[2]) else null }.toMap()
     }
 
     /** For tests and renders: a catalogue read from a file. */

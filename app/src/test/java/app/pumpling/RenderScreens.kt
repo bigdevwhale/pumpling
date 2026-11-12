@@ -61,6 +61,7 @@ class RenderScreens {
             "8-shop" to (0 to "shop"), "9-settings" to (0 to "settings"), "10-body" to (0 to "body"), "11-picker" to (0 to "picker"),
             "12-routine" to (1 to "routine"), "12b-routine-a" to (1 to null), "13-wrapped" to (3 to "wrapped"),
             "15-share-sheet" to (0 to "share:GYM"),
+            "16-exercise-how" to (3 to "ex:mountain"), "17-workout-edit" to (1 to "edit:${last.id}"),
         )
         var i by mutableIntStateOf(-1)
         rule.mainClock.autoAdvance = false
@@ -83,7 +84,8 @@ class RenderScreens {
         Start.tab = 0; rule.runOnUiThread { i = 160 }; shot("1b-home-rain")
         // the live workout
         runBlocking { val w = c.start(null); listOf("squat", "bench", "plank", "run").forEach { c.addExercise(w, it) }
-            c.dao.setsOfNow(w).take(2).forEach { s -> c.dao.update(s.copy(done = true, doneAt = System.currentTimeMillis())) } }
+            c.dao.setsOfNow(w).take(2).forEach { s -> c.dao.update(s.copy(done = true, doneAt = System.currentTimeMillis())) }
+            c.addExercise(w, "bulgarian"); c.split(w, c.dao.setsOfNow(w).maxOf { it.block }, true) }
         Start.tab = 0; Start.open = "live"; rule.runOnUiThread { i = 200 }
         shot("14-live")
         // every card at full size, feed and story

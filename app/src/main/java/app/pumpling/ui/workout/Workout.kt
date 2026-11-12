@@ -74,12 +74,19 @@ import app.pumpling.work.Rest
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
+/**
+ * The live workout, or with [editId] a finished one opened for changes: the same blocks and sets,
+ * without the rest timer and the team, and «Save» instead of «Finish».
+ */
 @Composable
-fun WorkoutScreen(d: Data, nav: Nav) {
+fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
     val ctx = LocalContext.current; val c = ctx.container
-    val w = d.live
-    BackHandler { nav.pop() }
-    if (w == null) { LaunchedEffect(Unit) { delay(600); if (c.dao.liveNow() == null) nav.pop() }; Box(Modifier.fillMaxSize().background(C.bg)); return }
+    val edit = editId != 0L
+    val w = if (edit) d.workouts.firstOrNull { it.id == editId } else d.live
+    // leaving an edit keeps what was changed and drops the sets left unticked
+    fun leave() { if (edit && w != null) c.write { saveEdit(w.id, w.title, w.note, w.feel, w.start, w.end) }; nav.pop() }
+    BackHandler { leave() }
+    if (w == null) { LaunchedEffect(Unit) { delay(600); if (edit || c.dao.liveNow() == null) nav.pop() }; Box(Modifier.fillMaxSize().background(C.bg)); return }
     val sets = d.setsBy[w.id].orEmpty()
     val blocks = sets.groupBy { it.block }.toSortedMap()
     val last by produceState<Map<String, List<WSet>>>(emptyMap(), d.finished.size) { value = c.lastSets() }
@@ -92,21 +99,26 @@ fun WorkoutScreen(d: Data, nav: Nav) {
     var setMenu by remember { mutableStateOf<WSet?>(null) }
     var cancel by remember { mutableStateOf(false) }
     val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) { if (Build.VERSION.SDK_INT >= 33) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS) }
+    LaunchedEffect(Unit) { if (!edit && Build.VERSION.SDK_INT >= 33) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS) }
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(C.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.pop() }, contentAlignment = Alignment.Center) { Icon(Icons.DOWN, C.ink, 24.dp) }
+            Box(Modifier.size(44.dp).clip(CircleShape).clickable { leave() }, contentAlignment = Alignment.Center) { Icon(if (edit) Icons.BACK else Icons.DOWN, C.ink, 24.dp) }
             Column(Modifier.weight(1f).padding(start = 4.dp)) {
-                Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.h2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text((if (w.manual) app.pumpling.domain.fmtDayYear(app.pumpling.domain.dayOf(w.start)) else clock(((now - w.start) / 1000).toInt())) + " · " + tr("${sets.count { it.done }} подх.", "${sets.count { it.done }} sets"), style = T.small)
+                Text(if (edit) tr("Правка", "Editing") + " · " + w.title.ifEmpty { tr("тренировка", "workout") } else w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.h2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text((if (w.manual || edit) app.pumpling.domain.fmtDayYear(app.pumpling.domain.dayOf(w.start)) else clock(((now - w.start) / 1000).toInt())) + " · " + tr("${sets.count { it.done }} подх.", "${sets.count { it.done }} sets"), style = T.small)
             }
-            Btn(tr("Готово", "Finish"), small = true, color = C.ok) { finishing = true }
+            Btn(if (edit) tr("Сохранить", "Save") else tr("Готово", "Finish"), small = true, color = C.ok) { finishing = true }
         }
-        TeamStrip(d, sets)
+        if (!edit) TeamStrip(d, sets)
         LazyColumn(Modifier.weight(1f).fillMaxWidth().imePadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 120.dp)) {
-            item { app.pumpling.ui.components.Hint("live", d.s.seen, Icons.CHECK, tr("Как записывать", "How to log"), tr("Галочка – подход сделан, начнётся отдых. Нажмите на номер подхода: разминка, RPE или удаление. Строка «в прошлый раз» подскажет, к чему стремиться, а звёздочка – что будет рекорд.",
+            if (edit) item {
+                Text(tr("Изменения сохраняются сразу. Неотмеченные подходы уберутся. Рекорды пересчитаются, а съеденное питомцами останется как было.",
+                    "Changes are saved as you go. Unticked sets will be dropped. Records are worked out again; what the pets ate stays as it was."),
+                    style = T.small, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card2).padding(12.dp))
+                Spacer(Modifier.height(10.dp))
+            } else item { app.pumpling.ui.components.Hint("live", d.s.seen, Icons.CHECK, tr("Как записывать", "How to log"), tr("Галочка – подход сделан, начнётся отдых. Нажмите на номер подхода: разминка, RPE или удаление. Строка «в прошлый раз» подскажет, к чему стремиться, а звёздочка – что будет рекорд.",
                 "The tick marks a set done and starts the rest. Tap the set number for warm-up, RPE or delete. «Last time» shows what to beat; a star means a record."), Modifier.padding(bottom = 10.dp)) }
             if (blocks.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -116,18 +128,18 @@ fun WorkoutScreen(d: Data, nav: Nav) {
             }
             items(blocks.entries.toList(), key = { "b${it.key}" }) { (b, list) ->
                 val ex = Catalog.of(list.first().exId)
-                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, onMenu = { menu = b }, onSet = { setMenu = it }, onInfo = { nav.push(Screen.Exercise(ex.id)) })
+                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, live = !edit, doneAt = if (edit) w.end else 0L, onMenu = { menu = b }, onSet = { setMenu = it }, onInfo = { nav.push(Screen.Exercise(ex.id)) })
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Btn(tr("+ Упражнение", "+ Exercise"), Modifier.weight(1f)) { nav.push(Screen.Picker()) }
+                    Btn(tr("+ Упражнение", "+ Exercise"), Modifier.weight(1f)) { nav.push(Screen.Picker(into = if (edit) w.id else 0)) }
                 }
-                Text(tr("Отмените тренировку, если она началась случайно", "Cancel the workout if it was started by mistake"), style = T.small.copy(color = C.bad),
+                if (!edit) Text(tr("Отмените тренировку, если она началась случайно", "Cancel the workout if it was started by mistake"), style = T.small.copy(color = C.bad),
                     modifier = Modifier.fillMaxWidth().padding(top = 18.dp).clickable { cancel = true }, textAlign = TextAlign.Center)
             }
         }
     }
-        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 10.dp)) { RestBar(d, now) }
+        if (!edit) Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 10.dp)) { RestBar(d, now) }
     }
     menu?.let { b -> val l = blocks[b].orEmpty(); if (l.isEmpty()) { menu = null; return@let }
         Sheet({ menu = null }) {
@@ -136,6 +148,11 @@ fun WorkoutScreen(d: Data, nav: Nav) {
             Ghost(tr("Добавить разминочный подход", "Add a warm-up set"), Modifier.fillMaxWidth()) { c.write { addSet(w.id, b, warmup = true) }; menu = null }
             Spacer(Modifier.height(8.dp))
             Ghost(tr("Как делать, мышцы и история", "How to, muscles and history"), Modifier.fillMaxWidth()) { menu = null; nav.push(Screen.Exercise(l.first().exId)) }
+            Spacer(Modifier.height(8.dp))
+            val split = l.any { it.side != 0 }
+            Ghost(if (split) tr("Обе стороны вместе", "Both sides together") else tr("Левая и правая отдельно", "Left and right apart"), Modifier.fillMaxWidth()) { c.write { split(w.id, b, !split) }; menu = null }
+            if (!split) Text(tr("Для упражнений на одну руку или ногу: каждый подход станет парой Л и П.", "For one-arm or one-leg work: each set becomes an L and R pair."),
+                style = T.tiny, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
             val top = l.maxOf { it.weight }
             if (Catalog.of(l.first().exId).equip == app.pumpling.domain.Equip.BAR && top > d.s.bar) {
                 Spacer(Modifier.height(8.dp)); Ghost(tr("Блины на сторону для ${w(top)} ${unit()}", "Plates per side for ${w(top)} ${unit()}"), Modifier.fillMaxWidth()) { menu = null; plateCalc = top } }
@@ -154,6 +171,10 @@ fun WorkoutScreen(d: Data, nav: Nav) {
                 Column(Modifier.weight(1f)) { Text(tr("Разминочный", "Warm-up"), style = T.bodyB); Text(tr("Не идёт в рекорды и тоннаж, питомцу – треть порции", "Not counted for records or tonnage; a third of a portion"), style = T.small) }
                 app.pumpling.ui.components.Chip(if (s.warmup) tr("да", "yes") else tr("нет", "no"), s.warmup) { c.write { dao.update(s.copy(warmup = !s.warmup)) } }
             }
+            Text(tr("Сторона", "Side"), style = T.bodyB, modifier = Modifier.padding(top = 14.dp))
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0 to tr("обе", "both"), 1 to tr("левая", "left"), 2 to tr("правая", "right")).forEach { (v, t) ->
+                    app.pumpling.ui.components.Chip(t, s.side == v) { c.write { dao.update(s.copy(side = v)) } } } }
             Text(tr("Насколько тяжело (RPE)", "How hard (RPE)"), style = T.bodyB, modifier = Modifier.padding(top = 14.dp))
             Text(tr("10 – больше ни разу, 8 – оставалось два повтора", "10 – not one more, 8 – two reps left"), style = T.small)
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -168,7 +189,7 @@ fun WorkoutScreen(d: Data, nav: Nav) {
         Btn(tr("Отменить тренировку", "Cancel it"), Modifier.fillMaxWidth(), color = C.bad) { c.write { dao.deleteSetsOf(w.id); dao.deleteWorkout(w.id); Rest.stop(app) }; cancel = false; nav.pop() }
         Spacer(Modifier.height(8.dp)); Ghost(tr("Продолжить тренировку", "Keep training"), Modifier.fillMaxWidth()) { cancel = false }
     }
-    if (finishing) FinishSheet(d, nav) { finishing = false }
+    if (finishing) { if (edit) EditSheet(w, nav) { finishing = false } else FinishSheet(d, nav) { finishing = false } }
 }
 
 /** Moves an exercise block up or down in the live workout. */
@@ -199,7 +220,7 @@ private fun RestBar(d: Data, now: Long) {
 }
 
 @Composable
-private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, onMenu: () -> Unit, onSet: (WSet) -> Unit, onInfo: () -> Unit) {
+private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long, onMenu: () -> Unit, onSet: (WSet) -> Unit, onInfo: () -> Unit) {
     val c = LocalContext.current.container
     Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -211,14 +232,14 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
             Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onMenu), contentAlignment = Alignment.Center) { Icon(Icons.DOTS, C.mute, 20.dp) }
         }
         val ghost = last.filter { !it.warmup }
-        if (ghost.isNotEmpty()) Text(tr("В прошлый раз: ", "Last time: ") + ghost.joinToString(", ") { setLine(ex, it) } + hint(ex, ghost), style = T.small, modifier = Modifier.padding(top = 2.dp))
+        if (!live) Unit else if (ghost.isNotEmpty()) Text(tr("В прошлый раз: ", "Last time: ") + ghost.joinToString(", ") { setLine(ex, it) } + hint(ex, ghost), style = T.small, modifier = Modifier.padding(top = 2.dp))
         else Text(tr("Первый раз – рекордом будет следующий", "First time – the next one can be a record"), style = T.small, modifier = Modifier.padding(top = 2.dp))
         if (ex.kind == Kind.ASSIST || ex.kind == Kind.BODY || ex.kind == Kind.HOLD) {
             var more by remember { mutableStateOf(false) }
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.card2).clickable { more = !more }.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.Top) {
                 Text("?", style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(end = 8.dp))
-                Text(if (more) ex.kind.help else when (ex.kind) {
+                Text(if (more) ex.kind.help(ex) else when (ex.kind) {
                     Kind.ASSIST -> tr("Пишите вес помощи гравитрона: меньше помощь – сильнее вы", "Write the machine's help: less help – stronger you")
                     Kind.BODY -> tr("Вес – только если добавляете груз на пояс", "Weight only if you add a load on a belt")
                     else -> tr("Время удержания в секундах", "Hold time in seconds") } + if (more) "" else tr("  ·  подробнее", "  ·  more"), style = T.tiny.copy(color = C.ink))
@@ -229,8 +250,12 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
             heads(ex).forEach { Text(it, style = T.tiny, modifier = Modifier.weight(1f), textAlign = TextAlign.Center) }
             Spacer(Modifier.width(48.dp))
         }
-        var n = 0
-        list.sortedBy { it.idx }.forEach { s -> if (!s.warmup) n++; SetRow(s, ex, if (s.warmup) tr("Р", "W") else "$n", best, d, onSet) }
+        // a left and a right set share a number: «1Л», «1П»
+        var n = 0; var prevSide = 0
+        list.sortedBy { it.idx }.forEach { s ->
+            if (!s.warmup && !(s.side == 2 && prevSide == 1)) n++
+            if (!s.warmup) prevSide = s.side
+            SetRow(s, ex, if (s.warmup) tr("Р", "W") else "$n" + app.pumpling.domain.sideMark(s.side), best, d, live, doneAt, onSet) }
         Text(tr("+ подход", "+ set"), style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).clickable { c.write { addSet(wid, b) } }.padding(horizontal = 10.dp, vertical = 6.dp))
     }
 }
@@ -254,7 +279,7 @@ private fun heads(ex: Ex) = when (ex.kind) {
 }
 
 @Composable
-private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Best?, d: Data, onSet: (WSet) -> Unit) {
+private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long, onSet: (WSet) -> Unit) {
     val ctx = LocalContext.current; val c = ctx.container
     fun num(v: Double) = if (v == 0.0) "" else fmt2(v).replace(',', '.').let { if (app.pumpling.domain.Lang.ru) it.replace('.', ',') else it }
     var a by remember(s.id) { mutableStateOf(when (ex.kind) { Kind.CARDIO -> num(s.meters / 1000); Kind.MINUTES -> if (s.secs > 0) "${s.secs / 60}" else ""; else -> if (s.weight > 0) w(s.weight) else "" }) }
@@ -269,7 +294,7 @@ private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Bes
     fun save() = c.write { dao.update(build()) }
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val cur = build()
-    val willRecord = !s.warmup && best != null && best.sets > 0 && best.beats(ex, cur).isNotEmpty()
+    val willRecord = live && !s.warmup && best != null && best.sets > 0 && best.beats(ex, cur).isNotEmpty()
     val bg = if (s.done) C.okSoft else Color.Transparent
     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(bg).padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(40.dp).height(40.dp).clip(RoundedCornerShape(10.dp)).clickable { onSet(s) }, contentAlignment = Alignment.Center) {
@@ -281,11 +306,11 @@ private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Bes
         Field(a, { a = it; save() }, if (ex.kind == Kind.BODY) "0" else "–", Modifier.weight(1f).padding(horizontal = 3.dp), number = true, style = T.numS, center = true)
         if (ex.kind != Kind.MINUTES) Field(b, { b = it; save() }, "–", Modifier.weight(1f).padding(horizontal = 3.dp), number = true, style = T.numS, center = true)
         Box(Modifier.padding(start = 6.dp).size(40.dp).clip(RoundedCornerShape(12.dp)).background(if (s.done) C.ok else C.card2).clickable {
-            val now = System.currentTimeMillis(); focus.clearFocus()
+            val now = if (live) System.currentTimeMillis() else doneAt; focus.clearFocus()
             val upd = build().let { if (it.done) it.copy(done = false, doneAt = 0) else it.copy(done = true, doneAt = now) }
             // an empty set takes the numbers it showed as a hint
             c.write { dao.update(upd) }
-            if (!s.done && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest)
+            if (live && !s.done && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest)
         }, contentAlignment = Alignment.Center) { Icon(Icons.CHECK, if (s.done) Color.White else C.mute, 22.dp) }
     }
 }
@@ -346,6 +371,55 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
             c.write { val out = finish(w.id, title, note, feel, if (w.manual) w.start + mins * 60_000L else System.currentTimeMillis())
                 nav.pop(); if (out != null) nav.push(Screen.Result(w.id, out)) else say(tr("Пустая тренировка не сохранена", "An empty workout isn't saved")) }
         }
+    }
+}
+
+/** Saving an edited workout: its name, note and feel, and when it was and how long it took. */
+@Composable
+private fun EditSheet(w: app.pumpling.data.Workout, nav: Nav, onClose: () -> Unit) {
+    val c = LocalContext.current.container
+    var title by remember { mutableStateOf(w.title) }
+    var note by remember { mutableStateOf(w.note) }
+    var feel by remember { mutableStateOf(w.feel) }
+    val zone = java.time.ZoneId.systemDefault()
+    val t0 = java.time.Instant.ofEpochMilli(w.start).atZone(zone)
+    var day by remember { mutableLongStateOf(t0.toLocalDate().toEpochDay()) }
+    var mins0 by remember { mutableStateOf(t0.hour * 60 + t0.minute) }
+    var mins by remember { mutableStateOf(maxOf(1L, (w.end - w.start) / 60_000).toInt()) }
+    Sheet(onClose) {
+        Text(tr("Сохранить изменения", "Save the changes"), style = T.h2)
+        Spacer(Modifier.height(12.dp))
+        Field(title, { title = it }, tr("Название", "Name"), Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        Field(note, { note = it }, tr("Заметка", "A note"), Modifier.fillMaxWidth(), single = false)
+        Text(tr("Как прошло?", "How was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("😫", "😕", "🙂", "😄", "🔥").forEachIndexed { i, e ->
+                Box(Modifier.size(48.dp).clip(CircleShape).background(if (feel == i + 1) C.accSoft else C.card2).clickable { feel = if (feel == i + 1) 0 else i + 1 }, contentAlignment = Alignment.Center) { Text(e, style = T.h2) } }
+        }
+        Text(tr("Когда", "When"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Stepper(app.pumpling.domain.fmtDayYear(day), { day = minOf(app.pumpling.domain.today(), day + it) })
+        Spacer(Modifier.height(6.dp))
+        Stepper(tr("начало ", "start ") + "%d:%02d".format(mins0 / 60, mins0 % 60), { mins0 = (mins0 + it * 15 + 1440) % 1440 })
+        Spacer(Modifier.height(6.dp))
+        Stepper(tr("длилась $mins мин", "$mins min long"), { mins = (mins + it * 5).coerceIn(5, 600) })
+        Spacer(Modifier.height(16.dp))
+        Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), color = C.ok) {
+            val start = java.time.LocalDate.ofEpochDay(day).atStartOfDay(zone).toInstant().toEpochMilli() + mins0 * 60_000L
+            onClose()
+            c.write { if (saveEdit(w.id, title, note, feel, start, start + mins * 60_000L)) say(tr("Тренировка сохранена", "Workout saved")) else say(tr("Подходов не осталось – тренировка удалена", "No sets left – the workout is deleted")) }
+            nav.pop()
+        }
+    }
+}
+
+/** «‹ value ›»: a value stepped down and up. */
+@Composable
+private fun Stepper(text: String, onStep: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card2), verticalAlignment = Alignment.CenterVertically) {
+        Text("−", style = T.h2.copy(color = C.acc), modifier = Modifier.clickable { onStep(-1) }.padding(horizontal = 18.dp, vertical = 8.dp))
+        Text(text, style = T.bodyB, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+        Text("+", style = T.h2.copy(color = C.acc), modifier = Modifier.clickable { onStep(1) }.padding(horizontal = 18.dp, vertical = 8.dp))
     }
 }
 

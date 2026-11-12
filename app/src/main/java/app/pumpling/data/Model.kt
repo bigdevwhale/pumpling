@@ -1,6 +1,8 @@
 package app.pumpling.data
 
 import android.content.Context
+import androidx.room.AutoMigration
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -34,6 +36,7 @@ data class Workout(
  * One set. [block] is the exercise's place in the workout, [idx] the set's place in it.
  * [weight] is kilograms (help for an assisted exercise), [meters] distance, [secs] time.
  * [pr] lists records the set broke («e1rm,weight,reps,hold,dist,time,pace»).
+ * [side] splits a one-sided exercise into a left and a right set: they share a number and count as one.
  */
 @Entity(indices = [Index("workoutId"), Index("exId")])
 data class WSet(
@@ -52,6 +55,8 @@ data class WSet(
     val doneAt: Long = 0,
     val pr: String = "",
     val superset: Int = 0,         // blocks with the same number > 0 are done as a superset
+    @ColumnInfo(defaultValue = "0")
+    val side: Int = 0,             // 0 both sides, 1 left, 2 right (a one-arm or one-leg set)
 )
 
 /** An exercise the user made. Its id in sets is «u<id>». */
@@ -171,7 +176,8 @@ interface Dao0 {
     @Query("DELETE FROM OwnEx") suspend fun clearOwnEx()
 }
 
-@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 1, exportSchema = true)
+@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 2, exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)])
 abstract class Db : RoomDatabase() {
     abstract fun dao(): Dao0
 

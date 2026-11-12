@@ -72,7 +72,7 @@ import app.pumpling.ui.theme.C
 import app.pumpling.ui.theme.T
 
 @Composable
-fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav) {
+fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav, into: Long = 0) {
     val c = LocalContext.current.container
     var q by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf(-1) }
@@ -113,7 +113,7 @@ fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav) {
         Btn(if (picked.isEmpty()) tr("Выберите упражнения", "Pick exercises") else tr("Добавить (${picked.size})", "Add (${picked.size})"), Modifier.fillMaxWidth().padding(vertical = 10.dp), enabled = picked.isNotEmpty()) {
             val ids = picked.toList()
             if (forRoutine) { nav.picked = nav.picked + ids; nav.pop() }
-            else { val w = d.live; c.write { if (w != null) ids.forEach { addExercise(w.id, it) } }; nav.pop() }
+            else { val wid = if (into != 0L) into else d.live?.id; c.write { if (wid != null) ids.forEach { addExercise(wid, it) } }; nav.pop() }
         }
     }
 }
@@ -157,7 +157,7 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.card2).padding(14.dp)) {
             Icon(app.pumpling.ui.journal.kindIcon(kind), C.acc, 20.dp)
-            Text(kind.help, style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
+            Text(kind.help(), style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
         }
         Section(icon = Icons.ARM, text = tr("Какие мышцы работают", "Muscles worked"))
         Column(Modifier.fillMaxWidth().card(18.dp).padding(14.dp)) {
@@ -182,7 +182,9 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), enabled = name.isNotBlank()) {
             c.write { val exId = saveOwn(OwnEx(id = old?.id ?: 0, name = name.trim(), kind = kind.code.toString(), primary = prim.joinToString(",") { it.id }, equip = equip, cat = auto.id))
                 say(tr("Упражнение сохранено", "Exercise saved"))
-                val w = d.live; if (old == null && w != null && nav.stack.any { it is Screen.Live }) addExercise(w.id, exId) }
+                // made from the picker of a workout: it goes straight into that workout
+                val into = when (val top = nav.stack.lastOrNull { it is Screen.Live || it is Screen.Edit }) { is Screen.Edit -> top.id; Screen.Live -> d.live?.id; else -> null }
+                if (old == null && into != null) addExercise(into, exId) }
             nav.pop()
         }
         if (name.isBlank()) Text(tr("Начните с названия – вверху", "Start with the name – at the top"), style = T.small, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), textAlign = TextAlign.Center)
@@ -249,7 +251,7 @@ fun ResultPage(r: Screen.Result, d: Data, nav: Nav) {
             var saved by remember { mutableStateOf(false) }
             Ghost(if (saved) tr("Сохранено в программы ✓", "Saved to routines ✓") else tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
                 if (!saved) { saved = true; val sets = d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }
-                    val plans = sets.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.size, l.first().reps, l.first().weight, l.first().secs) }
+                    val plans = sets.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs) }
                     ctx.container.write { dao.insert(Routine(name = w.title.ifEmpty { tr("Программа", "Routine") }, items = Plan.join(plans), created = System.currentTimeMillis()))
                         say(tr("Программа «${w.title}» сохранена – она в журнале", "Routine «${w.title}» saved – find it in the log")) } } } }
         Spacer(Modifier.height(8.dp))
@@ -330,6 +332,10 @@ fun ExInfoSheet(exId: String, d: Data, nav: Nav) {
                     best.reps > 0 -> tr("Больше всего повторов: ${best.reps}", "Most reps: ${best.reps}"); else -> tr("Подходов: ${best.sets}", "Sets: ${best.sets}") }, style = T.smallB, modifier = Modifier.padding(top = 4.dp))
             }
         }
+        if (ex.how.isNotEmpty()) {
+            Text(tr("Как выполнять", "How to do it"), style = T.sec, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+            Text(ex.how, style = T.body.copy(color = C.ink))
+        }
         if (ex.primary.isNotEmpty()) {
             Text(tr("Целевые мышцы", "Target muscles"), style = T.sec, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
             app.pumpling.ui.components.TargetMap(ex.primary, ex.secondary, h = 210.dp)
@@ -338,7 +344,7 @@ fun ExInfoSheet(exId: String, d: Data, nav: Nav) {
         }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card2).padding(12.dp)) {
             Icon(app.pumpling.ui.journal.kindIcon(ex.kind), C.acc, 18.dp)
-            Text(ex.kind.help, style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
+            Text(ex.kind.help(ex), style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
         }
         Spacer(Modifier.height(14.dp))
         Ghost(tr("История и прогресс", "History and progress"), Modifier.fillMaxWidth()) { nav.info = null; nav.push(Screen.Exercise(exId)) }

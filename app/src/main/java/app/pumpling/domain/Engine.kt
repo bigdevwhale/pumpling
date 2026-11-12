@@ -113,6 +113,7 @@ object Engine {
                 Kind.CARDIO -> x.secs / 60.0 / 4
                 Kind.MINUTES -> x.secs / 60.0 / 5
             }
+            if (x.side != 0) f *= .5   // a left and a right set make one set together
             if (x.rpe >= 8 && !x.warmup) f *= 1.15
             val pr = x.pr.isNotEmpty()
             if (pr) f *= 1.5
@@ -161,7 +162,7 @@ object Engine {
         val seen = beforeSets.map { it.exId }.toSet()
         val newEx = work.map { it.exId }.distinct().filter { it !in seen }
         val records = work.flatMap { x -> x.pr.split(',').mapNotNull { Rec.of(it) }.map { x to it } }
-        var plates = 5 + min(20, work.count { !it.warmup }) + 10 * records.map { it.first.exId to it.second }.distinct().size
+        var plates = 5 + min(20, work.count { !it.warmup && it.side != 2 }) + 10 * records.map { it.first.exId to it.second }.distinct().size
         if (before.isNotEmpty() && team.any { it.nat() == Nature.CURIOUS }) plates += 3 * newEx.size
         return Outcome(total, plates, records, emptyList(), hatched, emptyList(), newEx, shares, bonus) to now
     }

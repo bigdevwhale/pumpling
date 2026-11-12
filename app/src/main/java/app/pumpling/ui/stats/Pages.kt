@@ -93,6 +93,10 @@ fun ExercisePage(exId: String, d: Data, nav: Nav) {
                 Text(ex.kind.name1, style = T.small)
             }
         }
+        if (ex.how.isNotEmpty()) {
+            Section(icon = Icons.GYM, text = tr("Как выполнять", "How to do it"))
+            Card { Text(ex.how, style = T.body.copy(color = C.ink)) }
+        }
         if (ex.primary.isNotEmpty()) {
             Section(icon = Icons.ARM, text = tr("Целевые мышцы", "Target muscles"))
             Card {
@@ -102,7 +106,7 @@ fun ExercisePage(exId: String, d: Data, nav: Nav) {
             }
         }
         Section(icon = Icons.EDIT, text = tr("Как записывать", "How to log it"))
-        Card { Text(ex.kind.help, style = T.small.copy(color = C.ink)) }
+        Card { Text(ex.kind.help(ex), style = T.small.copy(color = C.ink)) }
         if (all.isEmpty()) { Empty(tr("Это упражнение ещё не делали – история появится после первой тренировки", "Not done yet – the history shows after the first workout")); return@Page }
         Section(icon = Icons.STATS, text = tr("Ваши результаты", "Your results"))
         val b = st.bests[exId]

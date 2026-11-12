@@ -12,6 +12,7 @@ import app.pumpling.data.Routine
 import app.pumpling.data.SettingsStore
 import app.pumpling.data.WSet
 import app.pumpling.data.Workout
+import app.pumpling.domain.Best
 import app.pumpling.domain.Catalog
 import app.pumpling.domain.Cat
 import app.pumpling.domain.Engine
@@ -76,7 +77,12 @@ class AppContainer(context: Context) {
             val last = lastSets()
             val sets = Plan.parse(routine.items).flatMapIndexed { b, p ->
                 val prev = last[p.exId].orEmpty().filter { !it.warmup }
-                (0 until p.sets).map { i -> val pv = prev.getOrNull(i) ?: prev.lastOrNull()
+                if (prev.any { it.side != 0 }) {
+                    // done left and right last time: each planned set is a pair again
+                    val l = prev.filter { it.side != 2 }; val r = prev.filter { it.side == 2 }
+                    (0 until p.sets).flatMap { i -> listOf(1 to (l.getOrNull(i) ?: l.lastOrNull()), 2 to (r.getOrNull(i) ?: r.lastOrNull() ?: l.lastOrNull())).mapIndexed { k, (side, pv) ->
+                        WSet(workoutId = id, exId = p.exId, block = b, idx = i * 2 + k, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, side = side) } }
+                } else (0 until p.sets).map { i -> val pv = prev.getOrNull(i) ?: prev.lastOrNull()
                     WSet(workoutId = id, exId = p.exId, block = b, idx = i, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0) }
             }
             dao.insertSets(sets)
@@ -97,14 +103,40 @@ class AppContainer(context: Context) {
         val cur = dao.setsOfNow(workoutId); val block = (cur.maxOfOrNull { it.block } ?: -1) + 1
         val prev = lastSets()[exId].orEmpty().filter { !it.warmup }
         val ex = Catalog.of(exId)
-        val n = if (prev.isNotEmpty()) prev.size.coerceAtMost(6) else if (ex.kind.timed && ex.kind != Kind.HOLD) 1 else 3
+        val n = if (prev.isNotEmpty()) prev.size.coerceAtMost(if (prev.any { it.side != 0 }) 12 else 6) else if (ex.kind.timed && ex.kind != Kind.HOLD) 1 else 3
         dao.insertSets((0 until n).map { i -> val p = prev.getOrNull(i)
-            WSet(workoutId = workoutId, exId = exId, block = block, idx = i, weight = p?.weight ?: 0.0, reps = p?.reps ?: 0, secs = p?.secs ?: 0, meters = p?.meters ?: 0.0) })
+            WSet(workoutId = workoutId, exId = exId, block = block, idx = i, weight = p?.weight ?: 0.0, reps = p?.reps ?: 0, secs = p?.secs ?: 0, meters = p?.meters ?: 0.0, side = p?.side ?: 0) })
     }
 
+    /** A new set at the end of [block]; in a block done left and right, a new pair. */
     suspend fun addSet(workoutId: Long, block: Int, warmup: Boolean = false) {
-        val l = dao.setsOfNow(workoutId).filter { it.block == block }; val last = l.lastOrNull() ?: return
-        dao.insert(last.copy(id = 0, idx = (l.maxOf { it.idx }) + 1, done = false, doneAt = 0, pr = "", warmup = warmup, rpe = 0))
+        val l = dao.setsOfNow(workoutId).filter { it.block == block }.sortedBy { it.idx }; val last = l.lastOrNull() ?: return
+        val idx = l.maxOf { it.idx } + 1
+        fun fresh(from: WSet, i: Int, side: Int) = from.copy(id = 0, idx = i, done = false, doneAt = 0, pr = "", warmup = warmup, rpe = 0, side = side)
+        if (l.any { it.side != 0 } && !warmup) {
+            val left = l.lastOrNull { it.side != 2 && !it.warmup } ?: last; val right = l.lastOrNull { it.side == 2 && !it.warmup } ?: left
+            dao.insertSets(listOf(fresh(left, idx, 1), fresh(right, idx + 1, 2)))
+        } else dao.insert(fresh(last, idx, 0))
+    }
+
+    /**
+     * Splits [block] into left and right sets – each set becomes a pair – or, with [on] false,
+     * joins the pairs back keeping the left set of each.
+     */
+    suspend fun split(workoutId: Long, block: Int, on: Boolean) {
+        val l = dao.setsOfNow(workoutId).filter { it.block == block }.sortedBy { it.idx }
+        if (on) {
+            var i = 0; val upd = ArrayList<WSet>(); val add = ArrayList<WSet>()
+            for (x in l) {
+                if (x.side != 0 || x.warmup) { upd += x.copy(idx = i++); continue }
+                upd += x.copy(idx = i++, side = 1)
+                add += x.copy(id = 0, idx = i++, side = 2, done = false, doneAt = 0, pr = "", rpe = 0)
+            }
+            dao.updateSets(upd); dao.insertSets(add)
+        } else {
+            l.filter { it.side == 2 }.forEach { dao.deleteSet(it.id) }
+            dao.updateSets(l.filter { it.side != 2 }.mapIndexed { i, x -> x.copy(idx = i, side = 0) })
+        }
     }
 
     suspend fun finish(workoutId: Long, title: String, note: String, feel: Int, end: Long = System.currentTimeMillis()): Outcome? = lock.withLock {
@@ -146,6 +178,43 @@ class AppContainer(context: Context) {
         settings.update { it.copy(plates = it.plates + plates, questWeek = week, quests = questIds, questsDone = doneBefore + newQuests.map { q -> q.id },
             inbox = it.inbox + eggs.map { e -> "egg:$e" } + out0.hatched.map { p -> "hatch:${p.id}" }) }
         return out0.copy(plates = plates, eggs = eggs, quests = newQuests)
+    }
+
+    /**
+     * Marks the records again in every finished workout from [from] on, after a past workout was
+     * changed: a record there may have moved, and later sets may now break it or not.
+     */
+    suspend fun remark(from: Long) {
+        val ws = dao.workoutList().filter { it.end > 0 }.sortedBy { it.start }
+        val sets = dao.setList().filter { it.done }.groupBy { it.workoutId }
+        val bests = HashMap<String, Best>()
+        for (w in ws) {
+            var mine = sets[w.id].orEmpty()
+            if (w.start >= from) {
+                val marks = Records.mark(bests, mine)
+                val marked = mine.map { it.copy(pr = marks[it.id]?.joinToString(",") { r -> r.id }.orEmpty()) }
+                val changed = marked.filterIndexed { i, x -> x.pr != mine[i].pr }
+                if (changed.isNotEmpty()) dao.updateSets(changed)
+                val prs = marked.flatMap { x -> x.pr.split(',').mapNotNull { Rec.of(it) }.map { x.exId to it } }.distinct().size
+                if (prs != w.prs) dao.update(w.copy(prs = prs))
+                mine = marked
+            }
+            for (x in mine) if (!x.warmup) bests.getOrPut(x.exId) { Best() }.add(Catalog.of(x.exId), x)
+        }
+    }
+
+    /**
+     * Ends the editing of a finished workout: unticked sets go, the details are saved and records are
+     * marked again. What the pets ate stays as it was. Returns false when no set is left and the workout is deleted.
+     */
+    suspend fun saveEdit(workoutId: Long, title: String, note: String, feel: Int, start: Long, end: Long): Boolean = lock.withLock {
+        val w = dao.workout(workoutId) ?: return false
+        val mine = dao.setsOfNow(workoutId)
+        mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
+        if (mine.none { it.done }) { dao.deleteWorkout(workoutId); return false }
+        dao.update(w.copy(title = title.trim(), note = note.trim(), feel = feel, start = start, end = maxOf(end, start + 60_000)))
+        remark(minOf(w.start, start))
+        return true
     }
 
     suspend fun weekData(monday: Long, ws: List<Workout>? = null, ss: List<WSet>? = null): Week {

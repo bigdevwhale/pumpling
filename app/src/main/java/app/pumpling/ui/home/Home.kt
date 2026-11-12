@@ -192,13 +192,22 @@ private fun QuestFold(d: Data) {
 @Composable
 private fun FreshFold(d: Data) {
     val rec = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)).recovery() }
-    val tired = Muscle.entries.filter { (rec[it] ?: 0.0) >= .35 }
     if (d.finished.isEmpty()) return
+    // one figure shows both groups – resting and ready – and the lists under it say the same in words
+    fun isTired(m: Muscle) = (rec[m] ?: 0.0) >= .35
+    val (tired, fresh) = Muscle.entries.partition(::isTired)
+    // closed, it says in one line what is still resting; open, the figure and both lists
     app.pumpling.ui.components.Fold(icon = Icons.HEART, tint = C.ok, title = tr("Восстановление", "Recovery"),
         if (tired.isEmpty()) tr("Все мышцы отдохнули", "Every muscle is rested") else tr("Отдыхают: ", "Resting: ") + tired.joinToString(", ") { it.label.lowercase() }) {
-        app.pumpling.ui.components.BodyMap(rec, color = C.acc, h = 150.dp)
-        val fresh = Muscle.entries.filter { (rec[it] ?: 0.0) < .2 && it != Muscle.FORE && it != Muscle.CALVES }
-        if (fresh.isNotEmpty()) Text(tr("Свежие: ", "Fresh: ") + fresh.joinToString(", ") { it.label.lowercase() }, style = T.small.copy(color = C.ok), modifier = Modifier.padding(top = 6.dp))
+        app.pumpling.ui.components.RecoveryMap(rec, ::isTired, h = 180.dp)
+        @Composable fun line(label: String, tint: androidx.compose.ui.graphics.Color, l: List<Muscle>, none: String) =
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(tint))
+                Text(buildString { append(label); append(": "); append(if (l.isEmpty()) none else l.joinToString(", ") { it.label.lowercase() }) },
+                    style = T.small.copy(color = C.ink), modifier = Modifier.padding(start = 10.dp))
+            }
+        line(tr("Отдыхают", "Resting"), C.acc, tired, tr("никто – все отдохнули", "none – all rested"))
+        line(tr("Готовы к работе", "Ready to work"), C.ok, fresh, tr("пока никто", "none yet"))
     }
 }
 

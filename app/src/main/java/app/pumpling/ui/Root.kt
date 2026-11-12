@@ -79,6 +79,8 @@ object Start { var tab = 0; var open: String? = null }
 /** A page over the tabs. */
 sealed class Screen {
     data object Live : Screen()
+    /** A finished workout opened for changes, on the same screen as the live one. */
+    data class Edit(val id: Long) : Screen()
     data class Result(val workoutId: Long, val outcome: Outcome) : Screen()
     data class WorkoutView(val id: Long) : Screen()
     data class Exercise(val exId: String) : Screen()
@@ -86,8 +88,8 @@ sealed class Screen {
     data object Shop : Screen()
     data object Settings : Screen()
     data class RoutineEdit(val id: Long) : Screen()
-    /** Picks exercises: for the live workout or for a routine being edited. */
-    data class Picker(val forRoutine: Boolean = false) : Screen()
+    /** Picks exercises: for the live workout, a finished one being edited ([into]), or a routine being edited. */
+    data class Picker(val forRoutine: Boolean = false, val into: Long = 0) : Screen()
     data class OwnEdit(val id: Long) : Screen()
     data object BodyLog : Screen()
     data class Wrapped(val year: Int) : Screen()
@@ -144,7 +146,7 @@ fun Root(s: Settings) {
         when (Start.open) { "live" -> nav.push(Screen.Live); "shop" -> nav.push(Screen.Shop); "wrapped" -> nav.push(Screen.Wrapped(java.time.LocalDate.now().year))
             "body" -> nav.push(Screen.BodyLog); "settings" -> nav.push(Screen.Settings)
             "picker" -> nav.push(Screen.Picker()); "routine" -> nav.push(Screen.RoutineEdit(0))
-            else -> Start.open?.let { o -> if (o.startsWith("part:")) nav.push(Screen.StatsPart(o.drop(5).toInt())) else if (o.startsWith("pet:")) nav.push(Screen.PetInfo(o.drop(4).toLong())) else if (o.startsWith("workout:")) nav.push(Screen.WorkoutView(o.drop(8).toLong())) else if (o.startsWith("ex:")) nav.push(Screen.Exercise(o.drop(3))) else if (o.startsWith("share:")) nav.share = ShareReq(CardKind.valueOf(o.drop(6).substringBefore(':')), o.drop(6).substringAfter(':', "0").toLong()) } }
+            else -> Start.open?.let { o -> if (o.startsWith("part:")) nav.push(Screen.StatsPart(o.drop(5).toInt())) else if (o.startsWith("pet:")) nav.push(Screen.PetInfo(o.drop(4).toLong())) else if (o.startsWith("workout:")) nav.push(Screen.WorkoutView(o.drop(8).toLong())) else if (o.startsWith("edit:")) nav.push(Screen.Edit(o.drop(5).toLong())) else if (o.startsWith("ex:")) nav.push(Screen.Exercise(o.drop(3))) else if (o.startsWith("share:")) nav.share = ShareReq(CardKind.valueOf(o.drop(6).substringBefore(':')), o.drop(6).substringAfter(':', "0").toLong()) } }
         Start.open = null
     }
 
@@ -166,6 +168,7 @@ fun Root(s: Settings) {
         for (scr in nav.stack) Box(Modifier.fillMaxSize()) {
             when (scr) {
                 Screen.Live -> WorkoutScreen(data, nav)
+                is Screen.Edit -> WorkoutScreen(data, nav, editId = scr.id)
                 is Screen.Result -> ResultPage(scr, data, nav)
                 is Screen.WorkoutView -> WorkoutPage(scr.id, data, nav)
                 is Screen.Exercise -> ExercisePage(scr.exId, data, nav)
@@ -173,7 +176,7 @@ fun Root(s: Settings) {
                 Screen.Shop -> ShopPage(data, nav)
                 Screen.Settings -> SettingsPage(data, nav)
                 is Screen.RoutineEdit -> RoutinePage(scr.id, data, nav)
-                is Screen.Picker -> PickerPage(scr.forRoutine, data, nav)
+                is Screen.Picker -> PickerPage(scr.forRoutine, data, nav, scr.into)
                 is Screen.OwnEdit -> OwnExPage(scr.id, data, nav)
                 Screen.BodyLog -> BodyPage(data, nav)
                 is Screen.Wrapped -> WrappedPage(scr.year, data, nav)
