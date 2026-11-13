@@ -36,10 +36,7 @@ class Tally(val workouts: List<Workout>, val sets: List<WSet>, val s: Settings) 
         t.size >= 4 && t.average() >= 150 }
     val weeks = Weeks(days, s.weekGoal, s.sickDays)
 
-    fun tonnageOf(x: WSet): Double {
-        val ex = Catalog.of(x.exId)
-        return when (ex.kind) { Kind.WEIGHT -> x.weight * x.reps; Kind.BODY -> (bw * .7 + x.weight) * x.reps; Kind.ASSIST -> max(0.0, bw * .7 - x.weight) * x.reps; else -> 0.0 }
-    }
+    fun tonnageOf(x: WSet): Double = Tonnage.of(x, bw)
     fun workoutOf(x: WSet) = byW[x.workoutId]
 
     companion object { val PULLUPS = setOf("pullup", "chinup", "negative_pullup", "assisted_pullup") }

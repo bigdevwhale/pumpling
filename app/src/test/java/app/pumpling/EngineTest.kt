@@ -26,6 +26,15 @@ class EngineTest {
     private fun set(id: Long, w: Long, ex: String, kg: Double, reps: Int, warm: Boolean = false) =
         WSet(id = id, workoutId = w, exId = ex, block = 0, idx = id.toInt(), weight = kg, reps = reps, done = true, warmup = warm)
 
+    /** The «5 tonnes» quest counts what the journal calls «lifted», own-weight exercises too (#9). */
+    @Test fun volumeQuestCountsLikeTheJournal() {
+        val sets = listOf(set(1, 1, "squat", 100.0, 10), set(2, 1, "pushup", 0.0, 20), set(3, 1, "squat", 60.0, 10, warm = true))
+        val wk = app.pumpling.domain.Week(listOf(Workout(id = 1, start = 0, end = 1)), sets, emptyList(), emptyList(), 0, savedWeight = 80.0)
+        val q = app.pumpling.domain.Quests.byId.getValue("volume")
+        assertEquals(1000.0 + 80.0 * .7 * 20, q.progress(wk), 1e-6)
+        assertEquals(q.progress(wk), sets.filter { !it.warmup }.sumOf { app.pumpling.domain.Tonnage.of(it, 80.0) }, 1e-6)
+    }
+
     @Test fun epley() {
         assertEquals(100.0, e1rm(100.0, 1), 1e-9)
         assertEquals(116.67, e1rm(100.0, 5), .01)

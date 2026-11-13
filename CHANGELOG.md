@@ -6,6 +6,15 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.2.1] - 2026-11-13
+
+### Fixed
+- «Lift 5 tonnes this week» counts the same kilos as «lifted» in the journal: own-weight exercises (push-ups, pull-ups, dips…) count too, not only barbells and dumbbells (#9). A quest this week's workouts already met is paid when the app opens.
+
+<!-- tg
+Исправлено: задание «Поднять 5 тонн за неделю» считает тот же вес, что и «поднято» в журнале, – вместе с отжиманиями, подтягиваниями и другими упражнениями со своим весом. Если на этой неделе уже набрано, задание засчитается при открытии приложения.
+-->
+
 ## [1.2.0] - 2026-11-12
 
 - How to do each exercise: every one of the 275 has a short description of the technique, on its page and on its card.

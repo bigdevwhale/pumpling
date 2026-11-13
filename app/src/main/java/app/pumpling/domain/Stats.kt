@@ -59,8 +59,7 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
     val secs: Long get() = workouts.sumOf { max(0L, (it.end - it.start) / 1000) }
     val setsN get() = work.size
     val reps get() = work.sumOf { it.reps }
-    fun tonnageOf(x: WSet): Double { val ex = Catalog.of(x.exId)
-        return when (ex.kind) { Kind.WEIGHT -> x.weight * x.reps; Kind.BODY -> (bw * .7 + x.weight) * x.reps; Kind.ASSIST -> max(0.0, bw * .7 - x.weight) * x.reps; else -> 0.0 } }
+    fun tonnageOf(x: WSet): Double = Tonnage.of(x, bw)
     val tonnage: Double by lazy { work.sumOf { tonnageOf(it) } }
     val meters: Double get() = work.filter { Catalog.of(it.exId).kind == Kind.CARDIO }.sumOf { it.meters }
     val cardioSecs: Int get() = work.filter { Catalog.of(it.exId).cat == Cat.CARDIO }.sumOf { it.secs }

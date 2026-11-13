@@ -222,7 +222,7 @@ class AppContainer(context: Context) {
         val sets = ss ?: dao.setList()
         val inWeek = workouts.filter { dayOf(it.start) >= monday }.map { it.id }.toSet()
         val beforeIds = workouts.filter { dayOf(it.start) < monday }.map { it.id }.toSet()
-        return Week(workouts.filter { it.id in inWeek }, sets.filter { it.workoutId in inWeek }, sets.filter { it.workoutId in beforeIds && it.done }, dao.bodyList(), monday)
+        return Week(workouts.filter { it.id in inWeek }, sets.filter { it.workoutId in inWeek }, sets.filter { it.workoutId in beforeIds && it.done }, dao.bodyList(), monday, settings.now().bodyweight)
     }
 
     /** Daily housekeeping: digest past days, deal this week's quests. */
@@ -237,6 +237,11 @@ class AppContainer(context: Context) {
         } else if (s.digested == 0L) settings.update { it.copy(digested = t - 1) }
         val week = weekStart(t)
         if (settings.now().questWeek != week) settings.update { it.copy(questWeek = week, quests = Quests.deal(week), questsDone = emptySet()) }
+        // Quests already met by this week's finished workouts but not paid (a rule changed in an update, #9): pay now.
+        val now = settings.now()
+        val wk = weekData(week)
+        val met = now.quests.mapNotNull { Quests.byId[it] }.filter { it.id !in now.questsDone && it.progress(wk) >= it.need }
+        if (met.isNotEmpty()) settings.update { it.copy(plates = it.plates + met.sumOf { q -> q.plates }, questsDone = it.questsDone + met.map { q -> q.id }) }
     }
 
     fun newPet(species: String, slot: Int, hatched: Long = 0, nature: Nature? = null): Pet {

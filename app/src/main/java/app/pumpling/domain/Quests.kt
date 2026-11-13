@@ -9,10 +9,24 @@ class Quest(val id: String, val ru: String, val en: String, val plates: Int, val
     val label get() = tr(ru, en)
 }
 
-/** This week's workouts and sets, and everything done before it. */
-class Week(val workouts: List<Workout>, val sets: List<WSet>, val beforeSets: List<WSet>, val bodies: List<Body>, val start: Long) {
+/** This week's workouts and sets, and everything done before it. [savedWeight] is the settings' body weight (0 if unset). */
+class Week(val workouts: List<Workout>, val sets: List<WSet>, val beforeSets: List<WSet>, val bodies: List<Body>, val start: Long, savedWeight: Double = 0.0) {
     val work = sets.filter { it.done && !it.warmup }
+    /** Body weight as the journal takes it: the latest weigh-in, else the settings, else 70 kg. */
+    val bw: Double = bodies.firstOrNull { it.weight > 0 }?.weight ?: savedWeight.takeIf { it > 0 } ?: 70.0
+    /** Kilograms lifted, counted exactly like «поднято» in the journal (own-weight exercises too) (#9). */
+    val tonnage: Double get() = work.sumOf { Tonnage.of(it, bw) }
     fun catSets(c: Cat) = work.count { Catalog.of(it.exId).cat == c }.toDouble()
+}
+
+/** Kilograms moved in a set: weight × reps; with your own weight, 70% of it plus what's added (or minus the assist). */
+object Tonnage {
+    fun of(x: WSet, bw: Double): Double = when (Catalog.of(x.exId).kind) {
+        Kind.WEIGHT -> x.weight * x.reps
+        Kind.BODY -> (bw * .7 + x.weight) * x.reps
+        Kind.ASSIST -> kotlin.math.max(0.0, bw * .7 - x.weight) * x.reps
+        else -> 0.0
+    }
 }
 
 object Quests {
@@ -31,8 +45,7 @@ object Quests {
         Quest("early", "Тренировка до 9 утра", "A workout before 9 am", 20, 1.0) { w -> w.workouts.count { hourOf(it.start) < 9 }.toDouble() },
         Quest("rpe", "Отметить RPE в 10 подходах", "Note RPE on 10 sets", 15, 10.0) { w -> w.work.count { it.rpe > 0 }.toDouble() },
         Quest("long", "Тренировка дольше часа", "A workout over an hour", 20, 1.0) { w -> w.workouts.count { it.end - it.start >= 3600_000 }.toDouble() },
-        Quest("volume", "Поднять 5 тонн за неделю", "Lift 5 tonnes this week", 25, 5000.0) { w ->
-            w.work.filter { Catalog.of(it.exId).kind == Kind.WEIGHT }.sumOf { it.weight * it.reps } },
+        Quest("volume", "Поднять 5 тонн за неделю", "Lift 5 tonnes this week", 25, 5000.0) { w -> w.tonnage },
         Quest("weigh", "Взвеситься", "Weigh in", 10, 1.0) { w -> w.bodies.count { it.day >= w.start && it.weight > 0 }.toDouble() },
         Quest("routine", "Тренировка по программе", "A workout from a routine", 15, 1.0) { w -> w.workouts.count { it.routineId > 0 }.toDouble() },
         Quest("variety", "Три семейства упражнений за одну тренировку", "Three exercise families in one workout", 20, 1.0) { w ->
