@@ -60,6 +60,12 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
     val setsN get() = work.size
     val reps get() = work.sumOf { it.reps }
     fun tonnageOf(x: WSet): Double = Tonnage.of(x, bw)
+    /** The muscles a group class's set worked: what the user marked, else the class's own; null for any other set. */
+    fun classMuscles(x: WSet): List<Muscle>? {
+        val w = wById[x.workoutId] ?: return null
+        if (w.classOf.isEmpty() || x.exId != w.classOf) return null
+        return w.muscles.split(',').mapNotNull { Muscle.of(it) }.ifEmpty { Catalog.of(x.exId).muscles }
+    }
     val tonnage: Double by lazy { work.sumOf { tonnageOf(it) } }
     val meters: Double get() = work.filter { Catalog.of(it.exId).kind == Kind.CARDIO }.sumOf { it.meters }
     val cardioSecs: Int get() = work.filter { Catalog.of(it.exId).cat == Cat.CARDIO }.sumOf { it.secs }
@@ -137,7 +143,10 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
     /** Working sets per muscle: primary counts one, secondary a half. Only sets with weight or reps or holds. */
     val muscleSets: Map<Muscle, Double> by lazy {
         val m = HashMap<Muscle, Double>()
-        for (x in work) { val ex = Catalog.of(x.exId); if (ex.kind == Kind.CARDIO || ex.kind == Kind.MINUTES) continue
+        for (x in work) { val ex = Catalog.of(x.exId)
+            // A group class counts its muscles as one set per ten minutes, up to six (#10).
+            classMuscles(x)?.let { ms -> val n = (x.secs / 600.0).coerceIn(1.0, 6.0); ms.forEach { m[it] = (m[it] ?: 0.0) + n }; continue }
+            if (ex.kind == Kind.CARDIO || ex.kind == Kind.MINUTES) continue
             ex.primary.forEach { m[it] = (m[it] ?: 0.0) + 1 }; ex.secondary.forEach { m[it] = (m[it] ?: 0.0) + .5 } }
         m
     }
@@ -154,6 +163,8 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
         for (x in allDone) { if (x.warmup) continue; val ex = Catalog.of(x.exId); val t = wById[x.workoutId]?.end ?: continue
             if (now - t > 4 * 86400_000L) continue
             val f = ((4 * 86400_000.0 - (now - t)) / (4 * 86400_000.0)).coerceIn(0.0, 1.0)
+            val cm = classMuscles(x)
+            if (cm != null) { val n = (x.secs / 600.0).coerceIn(1.0, 6.0); cm.forEach { load[it] = (load[it] ?: 0.0) + f * n; last[it] = max(last[it] ?: 0, t) }; continue }
             ex.primary.forEach { load[it] = (load[it] ?: 0.0) + f }; ex.secondary.forEach { load[it] = (load[it] ?: 0.0) + f * .5 }
             ex.muscles.forEach { last[it] = max(last[it] ?: 0, t) } }
         // fatigue 0..1: about 8 recent sets on a muscle tire it fully

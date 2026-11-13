@@ -6,6 +6,15 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.3.0] - 2026-11-13
+
+### Added
+- Group classes (#10): «Group class» in the start sheet – pilates, stretching, yoga, circuit, HIIT, tabata, dance, aqua aerobics, kickboxing, martial arts or anything else, with a name if you like. Only a timer runs; there's nothing to log as it goes. At the end you mark how hard it was (1–10), how it went and which muscles worked; exercises can still be logged with «Log exercises too». The pets eat by the minutes and the effort, the class counts for the week, the muscle map and recovery, and «Do it again» starts the same class.
+
+<!-- tg
+Новое: групповые занятия. Выбери пилатес, растяжку, йогу, круговую или что-то своё – пойдёт только таймер, записывать по ходу ничего не нужно. В конце отметь, насколько было тяжело и какие мышцы работали.
+-->
+
 ## [1.2.1] - 2026-11-13
 
 ### Fixed

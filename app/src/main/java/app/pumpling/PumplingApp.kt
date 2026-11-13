@@ -90,6 +90,23 @@ class AppContainer(context: Context) {
         return id
     }
 
+    /** A group class: a workout with one timed «set» of [exId], filled in when it ends (#10). */
+    suspend fun startClass(exId: String, title: String, at: Long = System.currentTimeMillis()): Long {
+        dao.liveNow()?.let { return it.id }
+        val id = dao.insert(Workout(start = at, title = title.trim(), classOf = exId))
+        dao.insertSets(listOf(WSet(workoutId = id, exId = exId, block = 0, idx = 0)))
+        return id
+    }
+
+    /** Writes how a class went into its timed set and the workout, before [finish]. */
+    suspend fun closeClass(workoutId: Long, hard: Int, muscles: List<app.pumpling.domain.Muscle>, end: Long) {
+        val w = dao.workout(workoutId) ?: return
+        val secs = ((end - w.start) / 1000).toInt().coerceAtLeast(60)
+        dao.setsOfNow(workoutId).firstOrNull { it.exId == w.classOf && it.block == 0 }?.let { s ->
+            dao.update(s.copy(secs = secs, rpe = hard, done = true, doneAt = end)) }
+        dao.update(w.copy(muscles = muscles.joinToString(",") { it.id }))
+    }
+
     /** Sets of the last finished workout that had each exercise, to show as the ghost and fill new sets. */
     suspend fun lastSets(): Map<String, List<WSet>> {
         val ws = dao.workoutList().filter { it.end > 0 }.sortedByDescending { it.start }

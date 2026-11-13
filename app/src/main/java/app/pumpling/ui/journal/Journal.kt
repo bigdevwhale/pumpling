@@ -287,9 +287,9 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
             }
         }
         // what it worked
-        val prim = work.flatMap { Catalog.of(it.exId).primary }.distinct()
+        val prim = work.flatMap { st.classMuscles(it) ?: Catalog.of(it.exId).primary }.distinct()
         if (prim.isNotEmpty()) {
-            val sec = work.flatMap { Catalog.of(it.exId).secondary }.distinct() - prim.toSet()
+            val sec = work.filter { st.classMuscles(it) == null }.flatMap { Catalog.of(it.exId).secondary }.distinct() - prim.toSet()
             Section(icon = Icons.ARM, text = tr("Что тренировали", "What it worked"))
             Column(Modifier.fillMaxWidth().card(20.dp).padding(14.dp)) {
                 app.pumpling.ui.components.TargetMap(prim, sec, h = 180.dp)
@@ -320,12 +320,14 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         Btn(tr("Повторить тренировку", "Do it again"), Modifier.fillMaxWidth(), enabled = d.live == null) {
-            c.write { val nid = start(null); dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }; sets.map { it.exId }.distinct().forEach { addExercise(nid, it) } }
+            // A group class starts again as a class with the same name (#10).
+            if (w.classOf.isNotEmpty()) c.write { startClass(w.classOf, w.title) }
+            else c.write { val nid = start(null); dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }; sets.map { it.exId }.distinct().forEach { addExercise(nid, it) } }
             nav.pop(); nav.push(Screen.Live) }
         Spacer(Modifier.height(8.dp))
         Ghost(tr("Изменить тренировку", "Edit the workout"), Modifier.fillMaxWidth()) { nav.push(Screen.Edit(w.id)) }
         Spacer(Modifier.height(8.dp))
-        Ghost(tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
+        if (w.classOf.isEmpty()) Ghost(tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
             val plans = sets.filter { !it.warmup }.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs) }
             c.write { dao.insert(Routine(name = w.title.ifEmpty { tr("Программа", "Routine") }, items = Plan.join(plans), created = System.currentTimeMillis())); say(tr("Программа сохранена", "Routine saved")) } }
         Spacer(Modifier.height(8.dp))

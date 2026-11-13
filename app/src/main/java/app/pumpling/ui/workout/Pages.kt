@@ -247,7 +247,7 @@ fun ResultPage(r: Screen.Result, d: Data, nav: Nav) {
         if (o.newEx.isNotEmpty() && d.finished.size > 1) Text(tr("Новые упражнения: ", "New exercises: ") + o.newEx.joinToString(", ") { Catalog.of(it).name }, style = T.small, modifier = Modifier.padding(top = 12.dp))
         Spacer(Modifier.height(18.dp))
         Btn(tr("Поделиться открыткой", "Share a card"), Modifier.fillMaxWidth()) { nav.share = ShareReq(CardKind.WORKOUT, r.workoutId) }
-        if (w != null && w.routineId == 0L) { Spacer(Modifier.height(8.dp))
+        if (w != null && w.routineId == 0L && w.classOf.isEmpty()) { Spacer(Modifier.height(8.dp))
             var saved by remember { mutableStateOf(false) }
             Ghost(if (saved) tr("Сохранено в программы ✓", "Saved to routines ✓") else tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
                 if (!saved) { saved = true; val sets = d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }
@@ -286,15 +286,29 @@ fun GearPopup(d: Data, onClose: () -> Unit, onAdded: (String) -> Unit = {}) {
 fun StartSheet(first: Long, d: Data, nav: Nav) {
     val c = LocalContext.current.container
     var pick by remember { mutableStateOf(first) }
+    // -1: a group class (#10)
+    var kind by remember { mutableStateOf(CLASSES.first()) }
+    var name by remember { mutableStateOf("") }
     val r = d.routines.firstOrNull { it.id == pick }
     val plans = r?.let { Plan.parse(it.items) }.orEmpty()
     app.pumpling.ui.components.Sheet({ nav.askStart = null }) {
         Text(tr("Начать тренировку?", "Start a workout?"), style = T.h2)
         Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            d.routines.forEach { x -> Chip(x.name, pick == x.id) { pick = x.id } }
             Chip(tr("Без программы", "No routine"), pick == 0L, color = C.ok) { pick = 0L }
+            Chip(tr("Групповое занятие", "Group class"), pick == -1L, color = C.ok) { pick = -1L }
+            d.routines.forEach { x -> Chip(x.name, pick == x.id) { pick = x.id } }
         }
-        Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+        if (pick == -1L) {
+            Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+                Text(tr("Пойдёт таймер, а записывать по ходу ничего не нужно. В конце отметите, насколько было тяжело и что работало.",
+                    "A timer runs and there's nothing to log as you go. At the end you say how hard it was and what it worked."), style = T.body)
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CLASSES.forEach { id -> Chip(if (id == "group_class") tr("Другое", "Other") else Catalog.of(id).name, kind == id) { kind = id } }
+                }
+                app.pumpling.ui.components.Field(name, { name = it.take(40) }, tr("Название, если хочется: «Пилатес у Маши»", "A name if you like: «Pilates with Anna»"), Modifier.fillMaxWidth().padding(top = 10.dp))
+            }
+        }
+        if (pick != -1L) Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
             if (r == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) { app.pumpling.ui.components.Badge(Icons.PLUS, C.ok)
                     Text(tr("Упражнения добавите по ходу – кнопкой «+ Упражнение».", "You add exercises as you go – with «+ Exercise»."), style = T.body, modifier = Modifier.padding(start = 12.dp)) }
@@ -311,10 +325,17 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Ghost(tr("Отмена", "Cancel"), Modifier.weight(1f)) { nav.askStart = null }
-            Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) { nav.askStart = null; c.write { start(r) }; nav.push(Screen.Live) }
+            Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) {
+                nav.askStart = null
+                if (pick == -1L) { val k = kind; val n = name.ifBlank { Catalog.of(k).name }; c.write { startClass(k, n) } } else c.write { start(r) }
+                nav.push(Screen.Live)
+            }
         }
     }
 }
+
+/** Kinds of group class to start, in this order; «group_class» is anything else. */
+val CLASSES = listOf("pilates", "stretching_class", "yoga", "circuit", "hiit", "tabata", "dance", "aqua_aerobics", "kickboxing", "martial", "group_class")
 
 /** An exercise's card over any screen: the picture, the target muscles, how to log it, your best, and the way to its history. */
 @Composable

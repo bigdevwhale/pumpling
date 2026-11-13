@@ -1,5 +1,8 @@
 package app.pumpling.ui.workout
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ColumnScope
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -98,6 +101,9 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
     var menu by remember { mutableStateOf<Int?>(null) }
     var setMenu by remember { mutableStateOf<WSet?>(null) }
     var cancel by remember { mutableStateOf(false) }
+    // A group class shows a timer; «also log exercises» opens the usual list.
+    val isClass = w.classOf.isNotEmpty() && !edit
+    var listing by remember(w.id) { mutableStateOf(false) }
     val askNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LaunchedEffect(Unit) { if (!edit && Build.VERSION.SDK_INT >= 33) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS) }
 
@@ -107,11 +113,12 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
             Box(Modifier.size(44.dp).clip(CircleShape).clickable { leave() }, contentAlignment = Alignment.Center) { Icon(if (edit) Icons.BACK else Icons.DOWN, C.ink, 24.dp) }
             Column(Modifier.weight(1f).padding(start = 4.dp)) {
                 Text(if (edit) tr("Правка", "Editing") + " · " + w.title.ifEmpty { tr("тренировка", "workout") } else w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.h2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text((if (w.manual || edit) app.pumpling.domain.fmtDayYear(app.pumpling.domain.dayOf(w.start)) else clock(((now - w.start) / 1000).toInt())) + " · " + tr("${sets.count { it.done }} подх.", "${sets.count { it.done }} sets"), style = T.small)
+                Text((if (w.manual || edit) app.pumpling.domain.fmtDayYear(app.pumpling.domain.dayOf(w.start)) else clock(((now - w.start) / 1000).toInt())) + if (isClass && !listing) "" else " · " + tr("${sets.count { it.done }} подх.", "${sets.count { it.done }} sets"), style = T.small)
             }
             Btn(if (edit) tr("Сохранить", "Save") else tr("Готово", "Finish"), small = true, color = C.ok) { finishing = true }
         }
         if (!edit) TeamStrip(d, sets)
+        if (isClass && !listing) ClassBody(w, d, now, onList = { listing = true }, onCancel = { cancel = true }) else
         LazyColumn(Modifier.weight(1f).fillMaxWidth().imePadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 120.dp)) {
             if (edit) item {
                 Text(tr("Изменения сохраняются сразу. Неотмеченные подходы уберутся. Рекорды пересчитаются, а съеденное питомцами останется как было.",
@@ -339,6 +346,23 @@ private fun PlatePopup(kg: Double, d: Data, onClose: () -> Unit) {
 
 private fun plateColor(p: Double) = when { p >= 25 -> Color(0xFFD2484E); p >= 20 -> Color(0xFF2F6FD0); p >= 15 -> Color(0xFFE5B81E); p >= 10 -> Color(0xFF3E9C6A); p >= 5 -> Color(0xFFEDEDED); else -> Color(0xFF8A8A8A) }
 
+/** A group class going on: its name, the clock, the pet, and nothing to fill in (#10). */
+@Composable
+private fun ColumnScope.ClassBody(w: app.pumpling.data.Workout, d: Data, now: Long, onList: () -> Unit, onCancel: () -> Unit) {
+    Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        app.pumpling.ui.art.ExThumb(Catalog.of(w.classOf), 96.dp)
+        Text(Catalog.of(w.classOf).name, style = T.body, modifier = Modifier.padding(top = 8.dp))
+        Text(clock(((now - w.start) / 1000).toInt()), style = T.num.copy(fontSize = 56.sp), modifier = Modifier.padding(top = 6.dp))
+        d.leader?.let { PetView(it, 140.dp, Pose.WORK) }
+        Text(tr("Занимайтесь – записывать ничего не нужно. Когда закончите, нажмите «Готово».", "Just train – there's nothing to log. Tap «Finish» when it's over."),
+            style = T.small, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+        Ghost(tr("Записать и упражнения", "Log exercises too"), Modifier.padding(top = 18.dp)) { onList() }
+        Text(tr("Отменить, если началось случайно", "Cancel if started by mistake"), style = T.small.copy(color = C.bad),
+            modifier = Modifier.padding(top = 18.dp).clickable { onCancel() }, textAlign = TextAlign.Center)
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
     val ctx = LocalContext.current; val c = ctx.container
@@ -347,11 +371,14 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
     var note by remember { mutableStateOf(w.note) }
     var feel by remember { mutableStateOf(0) }
     var mins by remember { mutableStateOf(60) }
-    val done = d.setsBy[w.id].orEmpty().count { it.done }
+    val isClass = w.classOf.isNotEmpty()
+    var hard by remember { mutableStateOf(0) }
+    var muscles by remember { mutableStateOf(Catalog.of(w.classOf.ifEmpty { "group_class" }).muscles.toSet()) }
+    val done = d.setsBy[w.id].orEmpty().count { it.done } + if (isClass) 1 else 0
     Sheet(onClose) {
         Text(tr("Закончить тренировку?", "Finish the workout?"), style = T.h2)
         if (done == 0) Text(tr("Ни один подход не отмечен – тренировка не сохранится.", "No set is ticked, so nothing will be saved."), style = T.small.copy(color = C.bad), modifier = Modifier.padding(top = 4.dp))
-        else Text(tr("Неотмеченные подходы уберутся.", "Unticked sets will be dropped."), style = T.small, modifier = Modifier.padding(top = 4.dp))
+        else if (!isClass) Text(tr("Неотмеченные подходы уберутся.", "Unticked sets will be dropped."), style = T.small, modifier = Modifier.padding(top = 4.dp))
         Spacer(Modifier.height(12.dp))
         Field(title, { title = it }, tr("Название", "Name"), Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
@@ -361,6 +388,17 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
             listOf("😫", "😕", "🙂", "😄", "🔥").forEachIndexed { i, e ->
                 Box(Modifier.size(48.dp).clip(CircleShape).background(if (feel == i + 1) C.accSoft else C.card2).clickable { feel = i + 1 }, contentAlignment = Alignment.Center) { Text(e, style = T.h2) } }
         }
+        if (isClass) {
+            Text(tr("Насколько было тяжело?", "How hard was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp))
+            Text(tr("1 – легко, 10 – на пределе", "1 – easy, 10 – all out"), style = T.small)
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                (1..10).forEach { n ->
+                    Box(Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(10.dp)).background(if (hard == n) C.acc else C.card2).clickable { hard = n }, contentAlignment = Alignment.Center) {
+                        Text("$n", style = T.smallB.copy(color = if (hard == n) Color.White else C.ink)) } } }
+            Text(tr("Что работало?", "What did it work?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                app.pumpling.domain.Muscle.entries.forEach { m -> app.pumpling.ui.components.Chip(m.label, m in muscles) { muscles = if (m in muscles) muscles - m else muscles + m } } }
+        }
         if (w.manual) {
             Text(tr("Сколько длилась?", "How long was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(30, 45, 60, 75, 90, 120).forEach { m -> app.pumpling.ui.components.Chip("$m", mins == m) { mins = m } } }
@@ -368,7 +406,10 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Btn(tr("Закончить", "Finish"), Modifier.fillMaxWidth(), color = C.ok) {
             onClose(); Rest.stop(ctx)
-            c.write { val out = finish(w.id, title, note, feel, if (w.manual) w.start + mins * 60_000L else System.currentTimeMillis())
+            val picked = app.pumpling.domain.Muscle.entries.filter { m -> m in muscles }
+            c.write { val end = if (w.manual) w.start + mins * 60_000L else System.currentTimeMillis()
+                if (isClass) closeClass(w.id, hard, picked, end)
+                val out = finish(w.id, title, note, feel, end)
                 nav.pop(); if (out != null) nav.push(Screen.Result(w.id, out)) else say(tr("Пустая тренировка не сохранена", "An empty workout isn't saved")) }
         }
     }

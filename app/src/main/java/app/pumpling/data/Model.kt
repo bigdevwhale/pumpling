@@ -30,6 +30,10 @@ data class Workout(
     val leader: String = "",       // species that led the team
     val feel: Int = 0,             // 1..5 how it went, 0 not said
     val manual: Boolean = false,   // written afterwards, not followed live
+    /** A group class (#10): the exercise id of its kind (pilates, stretching…), followed by a timer instead of sets. */
+    @ColumnInfo(defaultValue = "") val classOf: String = "",
+    /** Muscles the user said a class worked, comma-separated Muscle ids; empty means the class's own. */
+    @ColumnInfo(defaultValue = "") val muscles: String = "",
 )
 
 /**
@@ -176,8 +180,8 @@ interface Dao0 {
     @Query("DELETE FROM OwnEx") suspend fun clearOwnEx()
 }
 
-@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 2, exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)])
+@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 3, exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
 abstract class Db : RoomDatabase() {
     abstract fun dao(): Dao0
 
