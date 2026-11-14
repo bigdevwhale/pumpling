@@ -9,6 +9,7 @@ import app.pumpling.domain.Engine
 import app.pumpling.domain.Rec
 import app.pumpling.domain.Records
 import app.pumpling.domain.Stage
+import app.pumpling.domain.Supersets
 import app.pumpling.domain.Weeks
 import app.pumpling.domain.e1rm
 import app.pumpling.domain.stage
@@ -105,6 +106,50 @@ class EngineTest {
         val help = ex.kind.help(ex)
         assertTrue(help, help.contains(ex.name))
         assertTrue(help, !help.contains("одтягиван") && !help.contains("ull-up"))
+    }
+
+    @Test fun supersetsLinkAndCut() {
+        assertEquals(listOf(1, 1, 0), Supersets.link(listOf(0, 0, 0), 0, true))
+        assertEquals(listOf(1, 1, 1), Supersets.link(listOf(1, 1, 0), 1, true))
+        assertEquals(listOf(0, 1, 1), Supersets.link(listOf(1, 1, 1), 0, false))
+        assertEquals(listOf(1, 1, 2, 2), Supersets.link(listOf(1, 1, 1, 1), 1, false))
+        // the same number on blocks that don't stand together is no superset
+        assertTrue(!Supersets.inSet(listOf(1, 0, 1), 0))
+        assertEquals(listOf(1, 0, 1), Supersets.link(listOf(1, 0, 1), 5, true))   // no such block: nothing changes
+    }
+
+    @Test fun plansKeepSupersetsAndOldPlansStillRead() {
+        val old = "squat|3|5|0.0|0;bench|3|5|0.0|0"
+        assertEquals(old, Plan.join(Plan.parse(old)))
+        val l = Plan.parse(old).map { it.copy(sup = 1) }
+        assertEquals(listOf(1, 1), Plan.parse(Plan.join(l)).map { it.sup })
+    }
+
+    @Test fun reminderFallsOnTheNextChosenDay() {
+        val mon = java.time.ZonedDateTime.of(2026, 11, 9, 12, 0, 0, 0, java.time.ZoneId.of("UTC"))   // a Monday noon
+        assertEquals(mon.withHour(18), app.pumpling.work.Remind.next(setOf(1, 3), 18 * 60, mon))
+        assertEquals(mon.plusDays(2).withHour(9), app.pumpling.work.Remind.next(setOf(1, 3), 9 * 60, mon))
+        assertEquals(mon.plusDays(7).withHour(9), app.pumpling.work.Remind.next(setOf(1), 9 * 60, mon))
+        assertEquals(null, app.pumpling.work.Remind.next(emptySet(), 9 * 60, mon))
+    }
+
+    @Test fun achievementsCountTiersAndPayEachOnce() {
+        val ws = (1L..10L).map { Workout(id = it, start = it * 86400_000, end = it * 86400_000 + 3600_000) }
+        val sets = ws.map { set(it.id, it.id, "squat", 100.0, 5) }
+        val d = app.pumpling.domain.AchData(app.pumpling.domain.Tally(ws, sets, Settings(bodyweight = 80.0)), emptyList(), Settings(), 0)
+        val a = app.pumpling.domain.Achievements
+        assertEquals(2, a.byId.getValue("workouts").level(a.byId.getValue("workouts").value(d)))
+        assertEquals(2, a.byId.getValue("own").level(a.byId.getValue("own").value(d)))   // 100 kg at 80 kg: ×0.5 and ×1
+        val fresh = a.fresh(d, emptySet())
+        assertTrue(fresh.any { it.first.id == "workouts" && it.second == 2 })
+        assertTrue(a.fresh(d, fresh.map { (x, l) -> a.key(x, l) }.toSet()).isEmpty())
+        assertTrue(a.all.all { x -> x.tiers == x.tiers.sorted() && x.tiers.distinct().size == x.tiers.size })
+        assertEquals(a.all.size, a.all.map { it.id }.distinct().size)
+    }
+
+    @Test fun questsHaveTheirOwnIds() {
+        assertEquals(app.pumpling.domain.Quests.all.size, app.pumpling.domain.Quests.byId.size)
+        assertTrue(Catalog.all().filter { it.matches("тяга к груди узким хватом") }.any { it.id == "close_pulldown" })   // #11
     }
 
     @Test fun oneSidedSetsAreMarked() {

@@ -57,6 +57,7 @@ import app.pumpling.domain.toKg
 import app.pumpling.domain.tr
 import app.pumpling.domain.unit
 import app.pumpling.domain.w
+import app.pumpling.domain.Supersets
 import app.pumpling.ui.Data
 import app.pumpling.ui.Nav
 import app.pumpling.ui.Screen
@@ -92,6 +93,9 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
     if (w == null) { LaunchedEffect(Unit) { delay(600); if (edit || c.dao.liveNow() == null) nav.pop() }; Box(Modifier.fillMaxSize().background(C.bg)); return }
     val sets = d.setsBy[w.id].orEmpty()
     val blocks = sets.groupBy { it.block }.toSortedMap()
+    // supersets: exercises next to each other that share a group number
+    val order = blocks.keys.toList()
+    val groups = order.map { blocks.getValue(it).first().superset }
     val last by produceState<Map<String, List<WSet>>>(emptyMap(), d.finished.size) { value = c.lastSets() }
     val bests by produceState<Map<String, app.pumpling.domain.Best>>(emptyMap(), d.finished.size) { value = app.pumpling.domain.Records.bests(d.doneSets) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -135,7 +139,9 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
             }
             items(blocks.entries.toList(), key = { "b${it.key}" }) { (b, list) ->
                 val ex = Catalog.of(list.first().exId)
-                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, live = !edit, doneAt = if (edit) w.end else 0L, onMenu = { menu = b }, onSet = { setMenu = it }, onInfo = { nav.push(Screen.Exercise(ex.id)) })
+                val at = order.indexOf(b)
+                Block(w.id, b, ex, list, last[ex.id].orEmpty(), bests[ex.id], d, live = !edit, doneAt = if (edit) w.end else 0L,
+                    sup = Supersets.inSet(groups, at), tied = Supersets.linked(groups, at), onMenu = { menu = b }, onSet = { setMenu = it }, onInfo = { nav.push(Screen.Exercise(ex.id)) })
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -160,6 +166,17 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
             Ghost(if (split) tr("Обе стороны вместе", "Both sides together") else tr("Левая и правая отдельно", "Left and right apart"), Modifier.fillMaxWidth()) { c.write { split(w.id, b, !split) }; menu = null }
             if (!split) Text(tr("Для упражнений на одну руку или ногу: каждый подход станет парой Л и П.", "For one-arm or one-leg work: each set becomes an L and R pair."),
                 style = T.tiny, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            val at = order.indexOf(b); val tied = Supersets.linked(groups, at)
+            if (at < order.size - 1) {
+                Spacer(Modifier.height(8.dp))
+                Ghost(if (tied) tr("Разорвать суперсет со следующим", "Cut the superset with the next one") else tr("Суперсет со следующим упражнением", "Superset with the next exercise"), Modifier.fillMaxWidth()) { c.write { link(w.id, b, !tied) }; menu = null }
+                if (!tied) Text(tr("Упражнения идут подряд без отдыха: таймер запустится только после последнего.", "The exercises go back to back: the rest timer starts only after the last one."),
+                    style = T.tiny, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            }
+            if (!tied && Supersets.linked(groups, at - 1)) {
+                Spacer(Modifier.height(8.dp))
+                Ghost(tr("Убрать из суперсета", "Take out of the superset"), Modifier.fillMaxWidth()) { c.write { link(w.id, order[at - 1], false) }; menu = null }
+            }
             val top = l.maxOf { it.weight }
             if (Catalog.of(l.first().exId).equip == app.pumpling.domain.Equip.BAR && top > d.s.bar) {
                 Spacer(Modifier.height(8.dp)); Ghost(tr("Блины на сторону для ${w(top)} ${unit()}", "Plates per side for ${w(top)} ${unit()}"), Modifier.fillMaxWidth()) { menu = null; plateCalc = top } }
@@ -227,9 +244,13 @@ private fun RestBar(d: Data, now: Long) {
 }
 
 @Composable
-private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long, onMenu: () -> Unit, onSet: (WSet) -> Unit, onInfo: () -> Unit) {
+private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long,
+                  sup: Boolean, tied: Boolean, onMenu: () -> Unit, onSet: (WSet) -> Unit, onInfo: () -> Unit) {
     val c = LocalContext.current.container
-    Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
+    // [sup]: part of a superset; [tied]: the next exercise follows without a rest, and the cards stand closer
+    Column(Modifier.padding(bottom = if (tied) 4.dp else 12.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
+        if (sup) Text(tr("СУПЕРСЕТ", "SUPERSET") + if (!live) "" else if (tied) tr(" · без отдыха, сразу к следующему", " · no rest, straight to the next") else tr(" · после него отдых", " · rest after this one"),
+            style = T.sec.copy(color = C.acc), modifier = Modifier.padding(bottom = 8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             app.pumpling.ui.art.ExThumb(ex, 54.dp)
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
@@ -262,7 +283,7 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
         list.sortedBy { it.idx }.forEach { s ->
             if (!s.warmup && !(s.side == 2 && prevSide == 1)) n++
             if (!s.warmup) prevSide = s.side
-            SetRow(s, ex, if (s.warmup) tr("Р", "W") else "$n" + app.pumpling.domain.sideMark(s.side), best, d, live, doneAt, onSet) }
+            SetRow(s, ex, if (s.warmup) tr("Р", "W") else "$n" + app.pumpling.domain.sideMark(s.side), best, d, live, doneAt, rest = !tied, onSet) }
         Text(tr("+ подход", "+ set"), style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(10.dp)).clickable { c.write { addSet(wid, b) } }.padding(horizontal = 10.dp, vertical = 6.dp))
     }
 }
@@ -286,7 +307,7 @@ private fun heads(ex: Ex) = when (ex.kind) {
 }
 
 @Composable
-private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long, onSet: (WSet) -> Unit) {
+private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Best?, d: Data, live: Boolean, doneAt: Long, rest: Boolean, onSet: (WSet) -> Unit) {
     val ctx = LocalContext.current; val c = ctx.container
     fun num(v: Double) = if (v == 0.0) "" else fmt2(v).replace(',', '.').let { if (app.pumpling.domain.Lang.ru) it.replace('.', ',') else it }
     var a by remember(s.id) { mutableStateOf(when (ex.kind) { Kind.CARDIO -> num(s.meters / 1000); Kind.MINUTES -> if (s.secs > 0) "${s.secs / 60}" else ""; else -> if (s.weight > 0) w(s.weight) else "" }) }
@@ -317,7 +338,8 @@ private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Bes
             val upd = build().let { if (it.done) it.copy(done = false, doneAt = 0) else it.copy(done = true, doneAt = now) }
             // an empty set takes the numbers it showed as a hint
             c.write { dao.update(upd) }
-            if (live && !s.done && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest)
+            // no timer when rests are turned off, and none inside a superset until its last exercise
+            if (live && !s.done && rest && d.s.rest > 0 && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest, d.s.restSound)
         }, contentAlignment = Alignment.Center) { Icon(Icons.CHECK, if (s.done) Color.White else C.mute, 22.dp) }
     }
 }

@@ -12,7 +12,13 @@ import app.pumpling.data.Routine
 import app.pumpling.data.SettingsStore
 import app.pumpling.data.WSet
 import app.pumpling.data.Workout
+import androidx.room.withTransaction
+import app.pumpling.data.Health
+import app.pumpling.domain.AchData
+import app.pumpling.domain.Achievements
 import app.pumpling.domain.Best
+import app.pumpling.domain.Supersets
+import app.pumpling.domain.tr
 import app.pumpling.domain.Catalog
 import app.pumpling.domain.Cat
 import app.pumpling.domain.Engine
@@ -34,6 +40,8 @@ import app.pumpling.domain.Week
 import app.pumpling.domain.dayOf
 import app.pumpling.domain.today
 import app.pumpling.domain.weekStart
+import app.pumpling.work.Remind
+import app.pumpling.work.Rest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,11 +53,12 @@ import java.io.File
 import kotlin.random.Random
 
 /** One planned exercise of a routine. */
-data class Plan(val exId: String, val sets: Int, val reps: Int, val weight: Double, val secs: Int) {
-    fun code() = "$exId|$sets|$reps|$weight|$secs"
+data class Plan(val exId: String, val sets: Int, val reps: Int, val weight: Double, val secs: Int, val sup: Int = 0) {
+    /** [sup] – the superset group, see [app.pumpling.domain.Supersets] – is written only when there is one, so plans without it read as before. */
+    fun code() = "$exId|$sets|$reps|$weight|$secs" + if (sup > 0) "|$sup" else ""
     companion object {
         fun parse(items: String): List<Plan> = items.split(';').filter { it.isNotBlank() }.map { val c = it.split('|')
-            Plan(c[0], c.getOrNull(1)?.toIntOrNull() ?: 3, c.getOrNull(2)?.toIntOrNull() ?: 0, c.getOrNull(3)?.toDoubleOrNull() ?: 0.0, c.getOrNull(4)?.toIntOrNull() ?: 0) }
+            Plan(c[0], c.getOrNull(1)?.toIntOrNull() ?: 3, c.getOrNull(2)?.toIntOrNull() ?: 0, c.getOrNull(3)?.toDoubleOrNull() ?: 0.0, c.getOrNull(4)?.toIntOrNull() ?: 0, c.getOrNull(5)?.toIntOrNull() ?: 0) }
         fun join(l: List<Plan>) = l.joinToString(";") { it.code() }
     }
 }
@@ -81,9 +90,9 @@ class AppContainer(context: Context) {
                     // done left and right last time: each planned set is a pair again
                     val l = prev.filter { it.side != 2 }; val r = prev.filter { it.side == 2 }
                     (0 until p.sets).flatMap { i -> listOf(1 to (l.getOrNull(i) ?: l.lastOrNull()), 2 to (r.getOrNull(i) ?: r.lastOrNull() ?: l.lastOrNull())).mapIndexed { k, (side, pv) ->
-                        WSet(workoutId = id, exId = p.exId, block = b, idx = i * 2 + k, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, side = side) } }
+                        WSet(workoutId = id, exId = p.exId, block = b, idx = i * 2 + k, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, side = side, superset = p.sup) } }
                 } else (0 until p.sets).map { i -> val pv = prev.getOrNull(i) ?: prev.lastOrNull()
-                    WSet(workoutId = id, exId = p.exId, block = b, idx = i, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0) }
+                    WSet(workoutId = id, exId = p.exId, block = b, idx = i, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, superset = p.sup) }
             }
             dao.insertSets(sets)
         }
@@ -156,45 +165,57 @@ class AppContainer(context: Context) {
         }
     }
 
+    private class Finished(val w: Workout, val sets: List<WSet>, val out: Outcome, val week: Long, val questIds: List<String>, val doneBefore: Set<String>)
+
     suspend fun finish(workoutId: Long, title: String, note: String, feel: Int, end: Long = System.currentTimeMillis()): Outcome? = lock.withLock {
-        val w = dao.workout(workoutId) ?: return null
-        val mine = dao.setsOfNow(workoutId)
-        // sets never ticked are dropped; an empty workout is thrown away
-        mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
-        val done = mine.filter { it.done }
-        if (done.isEmpty()) { dao.deleteWorkout(workoutId); return null }
-        val all = dao.workoutList().filter { it.end > 0 && it.id != workoutId }
-        val before = all.filter { it.start < w.start }
-        val beforeIds = before.map { it.id }.toSet()
-        val allSets = dao.setList()
-        val beforeSets = allSets.filter { it.workoutId in beforeIds && it.done }
-        val marks = Records.mark(Records.bests(beforeSets), done)
-        val marked = done.map { it.copy(pr = marks[it.id]?.joinToString(",") { r -> r.id }.orEmpty()) }
-        dao.updateSets(marked)
         val s = settings.now()
-        val pets = dao.petList()
-        val (out0, fed) = Engine.feed(w, marked, before, beforeSets, pets, s)
-        dao.updatePets(fed)
-        val leader = Engine.team(fed).firstOrNull()?.species.orEmpty()
-        val finished = w.copy(end = maxOf(end, w.start + 60_000), title = title.trim(), note = note.trim(), feel = feel,
-            food = out0.food, prs = out0.records.map { it.first.exId to it.second }.distinct().size, leader = leader)
-        dao.update(finished)
-        // eggs found
-        val tally = Tally(all + finished, allSets.filter { it.workoutId != workoutId && it.workoutId in (all.map { it.id }.toSet()) } + marked, s)
-        val eggs = Engine.finds(tally, fed.map { it.species }.toSet())
-        val freeSlots = (0..2).filter { sl -> fed.none { it.slot == sl } }.toMutableList()
-        for (e in eggs) dao.insert(newPet(e, freeSlots.removeFirstOrNull() ?: -1).copy(found = dayOf(finished.start)))   // the day of that workout
-        // quests
-        val week = weekStart(today())
-        val wk = weekData(week, all + finished, allSets.filter { it.workoutId != workoutId } + marked)
-        val questIds = if (s.questWeek == week) s.quests else Quests.deal(week)
-        val doneBefore = if (s.questWeek == week) s.questsDone else emptySet()
-        val newQuests = questIds.mapNotNull { Quests.byId[it] }.filter { it.id !in doneBefore && it.progress(wk) >= it.need }
-        val plates = out0.plates + newQuests.sumOf { it.plates }
-        dao.update(finished.copy(plates = plates))
-        settings.update { it.copy(plates = it.plates + plates, questWeek = week, quests = questIds, questsDone = doneBefore + newQuests.map { q -> q.id },
-            inbox = it.inbox + eggs.map { e -> "egg:$e" } + out0.hatched.map { p -> "hatch:${p.id}" }) }
-        return out0.copy(plates = plates, eggs = eggs, quests = newQuests)
+        // Everything in the database changes together or not at all: pets fed without the workout closed would be fed again.
+        val f = db.withTransaction {
+            val w = dao.workout(workoutId) ?: return@withTransaction null
+            if (w.end > 0) return@withTransaction null
+            val mine = dao.setsOfNow(workoutId)
+            // sets never ticked are dropped; an empty workout is thrown away
+            mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
+            val done = mine.filter { it.done }
+            if (done.isEmpty()) { dao.deleteWorkout(workoutId); return@withTransaction null }
+            val all = dao.workoutList().filter { it.end > 0 && it.id != workoutId }
+            val before = all.filter { it.start < w.start }
+            val beforeIds = before.map { it.id }.toSet()
+            val allSets = dao.setList()
+            val beforeSets = allSets.filter { it.workoutId in beforeIds && it.done }
+            val marks = Records.mark(Records.bests(beforeSets), done)
+            val marked = done.map { it.copy(pr = marks[it.id]?.joinToString(",") { r -> r.id }.orEmpty()) }
+            dao.updateSets(marked)
+            val pets = dao.petList()
+            val (out0, fed) = Engine.feed(w, marked, before, beforeSets, pets, s)
+            dao.updatePets(fed)
+            val leader = Engine.team(fed).firstOrNull()?.species.orEmpty()
+            val finished = w.copy(end = maxOf(end, w.start + 60_000), title = title.trim(), note = note.trim(), feel = feel,
+                food = out0.food, prs = out0.records.map { it.first.exId to it.second }.distinct().size, leader = leader)
+            // eggs found
+            val tally = Tally(all + finished, allSets.filter { it.workoutId != workoutId && it.workoutId in (all.map { it.id }.toSet()) } + marked, s)
+            val eggs = Engine.finds(tally, fed.map { it.species }.toSet())
+            val freeSlots = (0..2).filter { sl -> fed.none { it.slot == sl } }.toMutableList()
+            for (e in eggs) dao.insert(newPet(e, freeSlots.removeFirstOrNull() ?: -1).copy(found = dayOf(finished.start)))   // the day of that workout
+            // quests
+            val week = weekStart(today())
+            val wk = weekData(week, all + finished, allSets.filter { it.workoutId != workoutId } + marked)
+            val questIds = if (s.questWeek == week) s.quests else Quests.deal(week)
+            val doneBefore = if (s.questWeek == week) s.questsDone else emptySet()
+            val newQuests = questIds.mapNotNull { Quests.byId[it] }.filter { it.id !in doneBefore && it.progress(wk) >= it.need }
+            // achievements this workout reached
+            val ach = Achievements.fresh(AchData(tally, dao.petList(), s, dao.bodyList().size), s.achieved)
+            val plates = out0.plates + newQuests.sumOf { it.plates } + ach.sumOf { Achievements.plates(it.second) }
+            val saved = finished.copy(plates = plates)
+            dao.update(saved)
+            Finished(saved, marked, out0.copy(plates = plates, eggs = eggs, quests = newQuests, achievements = ach), week, questIds, doneBefore)
+        } ?: return null
+        val out = f.out
+        settings.update { it.copy(plates = it.plates + out.plates, questWeek = f.week, quests = f.questIds, questsDone = f.doneBefore + out.quests.map { q -> q.id },
+            achieved = it.achieved + out.achievements.map { (a, l) -> Achievements.key(a, l) },
+            inbox = it.inbox + out.eggs.map { e -> "egg:$e" } + out.hatched.map { p -> "hatch:${p.id}" }) }
+        if (s.health) scope.launch(Dispatchers.IO) { Health.write(app, listOf(f.w to f.sets)) }
+        return out
     }
 
     /**
@@ -225,13 +246,47 @@ class AppContainer(context: Context) {
      * marked again. What the pets ate stays as it was. Returns false when no set is left and the workout is deleted.
      */
     suspend fun saveEdit(workoutId: Long, title: String, note: String, feel: Int, start: Long, end: Long): Boolean = lock.withLock {
-        val w = dao.workout(workoutId) ?: return false
-        val mine = dao.setsOfNow(workoutId)
-        mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
-        if (mine.none { it.done }) { dao.deleteWorkout(workoutId); return false }
-        dao.update(w.copy(title = title.trim(), note = note.trim(), feel = feel, start = start, end = maxOf(end, start + 60_000)))
-        remark(minOf(w.start, start))
-        return true
+        val kept = db.withTransaction {
+            val w = dao.workout(workoutId) ?: return@withTransaction null
+            val mine = dao.setsOfNow(workoutId)
+            mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
+            if (mine.none { it.done }) { dao.deleteWorkout(workoutId); remark(w.start); return@withTransaction null }
+            val now = w.copy(title = title.trim(), note = note.trim(), feel = feel, start = start, end = maxOf(end, start + 60_000))
+            dao.update(now)
+            remark(minOf(w.start, start))
+            now
+        }
+        if (settings.now().health) scope.launch(Dispatchers.IO) {
+            if (kept == null) Health.delete(app, workoutId) else Health.write(app, listOf(kept to dao.setsOfNow(workoutId))) }
+        return kept != null
+    }
+
+    /** Deletes a finished workout with its sets; records after it are marked again. What the pets ate stays. */
+    suspend fun deleteWorkout(workoutId: Long) = lock.withLock {
+        db.withTransaction {
+            val w = dao.workout(workoutId) ?: return@withTransaction
+            dao.deleteSetsOf(workoutId); dao.deleteWorkout(workoutId)
+            if (w.end > 0) remark(w.start)
+        }
+        if (settings.now().health) scope.launch(Dispatchers.IO) { Health.delete(app, workoutId) }
+    }
+
+    /** Ties exercise [block] to the next one as a superset, or cuts them apart. */
+    suspend fun link(workoutId: Long, block: Int, on: Boolean) = db.withTransaction {
+        val all = dao.setsOfNow(workoutId); val order = all.map { it.block }.distinct().sorted()
+        val now = Supersets.link(order.map { b -> all.first { it.block == b }.superset }, order.indexOf(block), on)
+        dao.updateSets(all.mapNotNull { x -> val g = now[order.indexOf(x.block)]; if (g != x.superset) x.copy(superset = g) else null })
+    }
+
+    /** Starts [w] over: the same exercises in the same supersets, sets and weights as last time. */
+    suspend fun again(w: Workout): Long {
+        val nid = start(null)
+        dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }
+        val old = dao.setsOfNow(w.id)
+        old.map { it.exId }.distinct().forEach { addExercise(nid, it) }
+        val sup = old.groupBy { it.exId }.mapValues { it.value.first().superset }
+        dao.updateSets(dao.setsOfNow(nid).filter { (sup[it.exId] ?: 0) > 0 }.map { it.copy(superset = sup.getValue(it.exId)) })
+        return nid
     }
 
     suspend fun weekData(monday: Long, ws: List<Workout>? = null, ss: List<WSet>? = null): Week {
@@ -259,6 +314,23 @@ class AppContainer(context: Context) {
         val wk = weekData(week)
         val met = now.quests.mapNotNull { Quests.byId[it] }.filter { it.id !in now.questsDone && it.progress(wk) >= it.need }
         if (met.isNotEmpty()) settings.update { it.copy(plates = it.plates + met.sumOf { q -> q.plates }, questsDone = it.questsDone + met.map { q -> q.id }) }
+        // Achievements reached outside a workout – a pet grew up, a thing was bought, the app was updated – are paid here.
+        val cur = settings.now()
+        val done = dao.workoutList().filter { it.end > 0 }; val ids = done.map { it.id }.toSet()
+        val ach = Achievements.fresh(AchData(Tally(done, dao.setList().filter { it.workoutId in ids }, cur), dao.petList(), cur, dao.bodyList().size), cur.achieved)
+        if (ach.isNotEmpty()) {
+            val plates = ach.sumOf { Achievements.plates(it.second) }
+            settings.update { it.copy(plates = it.plates + plates, achieved = it.achieved + ach.map { (a, l) -> Achievements.key(a, l) }) }
+            say(if (ach.size == 1) tr("Достижение «${ach[0].first.label}»: +$plates блинов", "Achievement «${ach[0].first.label}»: +$plates plates")
+                else tr("Новых достижений: ${ach.size}, +$plates блинов", "${ach.size} new achievements, +$plates plates"))
+        }
+    }
+
+    /** After a backup was read back: everything kept in memory follows the new data. */
+    suspend fun restored() {
+        loadOwn(); val s = settings.now(); Units.lb = s.lb
+        Rest.stop(app); Remind.schedule(app, s)
+        tick()
     }
 
     fun newPet(species: String, slot: Int, hatched: Long = 0, nature: Nature? = null): Pet {
@@ -289,6 +361,7 @@ class AppContainer(context: Context) {
     /** Fetches the weather for the window when it is older than half an hour; guesses the town from the time zone once. */
     suspend fun refreshOutside(force: Boolean = false) = kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching {
         var s = settings.now()
+        if (!s.weather) return@runCatching   // the window shows only the time of day; nothing goes online
         if (s.lat.isNaN() && !s.guessed) {
             val t = OutsideSource.guess(Lang.ru)
             settings.update { it.copy(guessed = true, town = t?.name ?: it.town, lat = t?.lat ?: it.lat, lon = t?.lon ?: it.lon) }
@@ -321,8 +394,10 @@ class PumplingApp : Application() {
         super.onCreate()
         Lang.ru = resources.configuration.locales[0].language == "ru"
         container = AppContainer(this)
+        app.pumpling.work.Rest.restore(this)
         container.scope.launch(Dispatchers.Default) { Catalog.builtin(this@PumplingApp); container.loadOwn()
-            Units.lb = container.settings.now().lb }
+            val s = container.settings.now(); Units.lb = s.lb
+            app.pumpling.work.Remind.schedule(this@PumplingApp, s) }
     }
 }
 

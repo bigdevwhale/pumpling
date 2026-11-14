@@ -6,6 +6,32 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.4.0] - 2026-11-14
+
+### Added
+- A backup file: Settings → More → «Backup» saves every workout, routine, pet, measurement with its photo and the settings into one file, and reads it back on this or a new phone.
+- Supersets: «Superset with the next exercise» in an exercise's menu during a workout, and in a routine. The exercises go back to back and the rest timer starts only after the last one. Routines, «Do it again» and «Save as a routine» keep them.
+- Achievements: 23 long-term ones with 108 tiers – workouts, weeks to plan, tonnage, records, distance, pull-ups, pets and more. Each tier pays plates. On the gym screen, in the stats and after a workout. Tiers already earned are paid when the app opens.
+- 12 more weekly quests: three workouts, records in two exercises, 10 km, an hour of cardio, a superset, a group class and others.
+- A workout reminder: pick the days and the time in Settings → Training. One notification, only if you haven't trained that day; quiet on sick leave.
+- Health Connect: turn it on in Settings → Profile and finished workouts are written there as exercise sessions for your other health apps. Nothing is read.
+- The rest timer can be turned off altogether, and rings when the rest is over (a switch beside it). Where Android holds exact alarms back, Settings offers to allow them, so the signal comes on time with the screen off.
+- The weather in the gym window can be turned off: the window then shows only the time of day and the app doesn't go online.
+
+### Fixed
+- «Тяга к груди узким хватом» now finds the close-grip pulldown (#11).
+- The end of a rest buzzed twice when the app was open.
+- Finishing a workout is saved in one piece: a crash in the middle can no longer feed the pets twice.
+- Pets grow and the week's quests change even if the app stayed open overnight.
+- Deleting a workout marks the records after it again.
+
+<!-- tg
+Новое: суперсеты – в меню упражнения «Суперсет со следующим», таймер отдыха запустится только после последнего упражнения.
+Достижения: 23 штуки со ступенями, за каждую дают блины. Плюс 12 новых заданий недели.
+Резервная копия в файл (Настройки → Ещё), напоминание о тренировке по дням, запись тренировок в Health Connect.
+Таймер отдыха теперь можно выключить совсем, а в конце отдыха он звонит. Погоду за окном зала тоже можно выключить.
+-->
+
 ## [1.3.0] - 2026-11-13
 
 ### Added

@@ -297,13 +297,16 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
             }
         }
         Section(icon = Icons.GYM, text = tr("Упражнения", "Exercises"))
-        sets.groupBy { it.block }.toSortedMap().values.forEach { l -> val ex = Catalog.of(l.first().exId); val ec = Color(ex.cat.color)
+        val blocks = sets.groupBy { it.block }.toSortedMap().values.toList()
+        val groups = blocks.map { it.first().superset }
+        blocks.forEachIndexed { at, l -> val ex = Catalog.of(l.first().exId); val ec = Color(ex.cat.color)
             Column(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).clickable { nav.push(Screen.Exercise(ex.id)) }.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     app.pumpling.ui.art.ExThumb(ex, 46.dp)
                     Column(Modifier.weight(1f).padding(start = 10.dp)) {
                         Text(ex.name, style = T.bodyB, maxLines = 2)
-                        Text(listOfNotNull(ex.cat.label, if (ex.kind == Kind.WEIGHT) tonnage(l.filter { !it.warmup }.sumOf { st.tonnageOf(it) }) else null).joinToString(" · "), style = T.tiny.copy(color = ec))
+                        Text(listOfNotNull(ex.cat.label, if (ex.kind == Kind.WEIGHT) tonnage(l.filter { !it.warmup }.sumOf { st.tonnageOf(it) }) else null,
+                            if (app.pumpling.domain.Supersets.inSet(groups, at)) tr("суперсет", "superset") else null).joinToString(" · "), style = T.tiny.copy(color = ec))
                     }
                 }
                 androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -322,13 +325,13 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
         Btn(tr("Повторить тренировку", "Do it again"), Modifier.fillMaxWidth(), enabled = d.live == null) {
             // A group class starts again as a class with the same name (#10).
             if (w.classOf.isNotEmpty()) c.write { startClass(w.classOf, w.title) }
-            else c.write { val nid = start(null); dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }; sets.map { it.exId }.distinct().forEach { addExercise(nid, it) } }
+            else c.write { again(w) }
             nav.pop(); nav.push(Screen.Live) }
         Spacer(Modifier.height(8.dp))
         Ghost(tr("Изменить тренировку", "Edit the workout"), Modifier.fillMaxWidth()) { nav.push(Screen.Edit(w.id)) }
         Spacer(Modifier.height(8.dp))
         if (w.classOf.isEmpty()) Ghost(tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
-            val plans = sets.filter { !it.warmup }.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs) }
+            val plans = sets.filter { !it.warmup }.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs, l.first().superset) }
             c.write { dao.insert(Routine(name = w.title.ifEmpty { tr("Программа", "Routine") }, items = Plan.join(plans), created = System.currentTimeMillis())); say(tr("Программа сохранена", "Routine saved")) } }
         Spacer(Modifier.height(8.dp))
         Ghost(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { askDelete = true }
@@ -336,7 +339,7 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
     if (askDelete) app.pumpling.ui.components.Popup({ askDelete = false }) {
         Text(tr("Удалить тренировку?", "Delete this workout?"), style = T.h2)
         Text(tr("Подходы и рекорды из неё пропадут. Съеденное питомцами останется.", "Its sets and records go. What the pets ate stays."), style = T.body, modifier = Modifier.padding(vertical = 10.dp))
-        Btn(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { c.write { dao.deleteSetsOf(w.id); dao.deleteWorkout(w.id) }; askDelete = false; nav.pop() }
+        Btn(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { c.write { deleteWorkout(w.id) }; askDelete = false; nav.pop() }
     }
 }
 
@@ -499,12 +502,13 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
             Text(tr("Пока пусто. Добавьте упражнения – подходы и повторы поправите здесь же.", "Empty for now. Add exercises – sets and reps are set right here."), style = T.body, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
         }
         plans.forEachIndexed { i, p -> val ex = Catalog.of(p.exId); val ec = Color(ex.cat.color)
-            Row(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(18.dp).padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 12.dp)) {
+            val groups = plans.map { it.sup }; val tied = app.pumpling.domain.Supersets.linked(groups, i)
+            Row(Modifier.padding(bottom = if (tied) 4.dp else 10.dp).fillMaxWidth().card(18.dp).padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 12.dp)) {
                 app.pumpling.ui.art.ExThumb(ex, 48.dp)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) { Text("${i + 1}. " + ex.name, style = T.bodyB, maxLines = 2)
-                            Text((listOf(ex.cat.label) + ex.primary.take(2).map { it.label.lowercase() }).joinToString(" · "), style = T.tiny.copy(color = ec), maxLines = 1) }
+                            Text((listOf(ex.cat.label) + ex.primary.take(2).map { it.label.lowercase() } + if (app.pumpling.domain.Supersets.inSet(groups, i)) listOf(tr("суперсет", "superset")) else emptyList()).joinToString(" · "), style = T.tiny.copy(color = ec), maxLines = 1) }
                         if (i > 0) Box(Modifier.size(36.dp).clip(CircleShape).clickable { val t = plans[i - 1]; plans[i - 1] = p; plans[i] = t }, contentAlignment = Alignment.Center) { Icon(Icons.UP, C.mute, 18.dp) }
                         Box(Modifier.size(36.dp).clip(CircleShape).clickable { plans.removeAt(i) }, contentAlignment = Alignment.Center) { Icon(Icons.CLOSE, C.mute, 18.dp) }
                     }
@@ -519,6 +523,10 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
                             else -> Stepper(tr("повторы", "reps"), "${p.reps}") { plans[i] = p.copy(reps = (p.reps + it).coerceIn(1, 50)) }
                         }
                     }
+                    // a superset: this exercise and the next go back to back, the rest comes after the last
+                    if (i < plans.lastIndex) Text(if (tied) tr("✓ Суперсет со следующим", "✓ Superset with the next one") else tr("+ Суперсет со следующим", "+ Superset with the next one"),
+                        style = T.smallB.copy(color = if (tied) C.acc else C.mute), modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(10.dp)).clickable {
+                            app.pumpling.domain.Supersets.link(groups, i, !tied).forEachIndexed { k, g -> if (plans[k].sup != g) plans[k] = plans[k].copy(sup = g) } }.padding(vertical = 4.dp, horizontal = 2.dp))
                 }
             }
         }

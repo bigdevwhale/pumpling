@@ -121,6 +121,8 @@ dependencies {
     // Installs the libraries' startup profiles on sideloaded APKs, so the first screen opens fast.
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.exifinterface)
+    // Finished workouts for other health apps on the phone, when the user asks for it.
+    implementation(libs.androidx.health.connect)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

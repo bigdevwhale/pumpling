@@ -92,6 +92,7 @@ sealed class Screen {
     data class Picker(val forRoutine: Boolean = false, val into: Long = 0) : Screen()
     data class OwnEdit(val id: Long) : Screen()
     data object BodyLog : Screen()
+    data object Achievements : Screen()
     data class Wrapped(val year: Int) : Screen()
     /** A stats section: 0 lifts, 1 muscles, 2 cardio, 3 records, 4 all the numbers. */
     data class StatsPart(val part: Int) : Screen()
@@ -140,11 +141,12 @@ fun Root(s: Settings) {
     val nav = remember { Nav().apply { tab = Start.tab } }
     var note by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { c.news.collect { note = it; delay(2600); note = null } }
-    LaunchedEffect(Unit) { c.tick() }
-    LaunchedEffect(Unit) { if (!app.pumpling.BuildConfig.SHOTS) while (true) { c.refreshOutside(); delay(30 * 60_000L) } }
+    // every time the app comes back: a night or a Monday may have passed while it sat in memory
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { c.write { tick() }; onPauseOrDispose { } }
+    LaunchedEffect(s.weather) { if (!app.pumpling.BuildConfig.SHOTS && s.weather) while (true) { c.refreshOutside(); delay(30 * 60_000L) } }
     LaunchedEffect(Unit) {
         when (Start.open) { "live" -> nav.push(Screen.Live); "shop" -> nav.push(Screen.Shop); "wrapped" -> nav.push(Screen.Wrapped(java.time.LocalDate.now().year))
-            "body" -> nav.push(Screen.BodyLog); "settings" -> nav.push(Screen.Settings)
+            "body" -> nav.push(Screen.BodyLog); "achievements" -> nav.push(Screen.Achievements); "settings" -> nav.push(Screen.Settings)
             "picker" -> nav.push(Screen.Picker()); "routine" -> nav.push(Screen.RoutineEdit(0))
             else -> Start.open?.let { o -> if (o.startsWith("part:")) nav.push(Screen.StatsPart(o.drop(5).toInt())) else if (o.startsWith("pet:")) nav.push(Screen.PetInfo(o.drop(4).toLong())) else if (o.startsWith("workout:")) nav.push(Screen.WorkoutView(o.drop(8).toLong())) else if (o.startsWith("edit:")) nav.push(Screen.Edit(o.drop(5).toLong())) else if (o.startsWith("ex:")) nav.push(Screen.Exercise(o.drop(3))) else if (o.startsWith("share:")) nav.share = ShareReq(CardKind.valueOf(o.drop(6).substringBefore(':')), o.drop(6).substringAfter(':', "0").toLong()) } }
         Start.open = null
@@ -179,6 +181,7 @@ fun Root(s: Settings) {
                 is Screen.Picker -> PickerPage(scr.forRoutine, data, nav, scr.into)
                 is Screen.OwnEdit -> OwnExPage(scr.id, data, nav)
                 Screen.BodyLog -> BodyPage(data, nav)
+                Screen.Achievements -> app.pumpling.ui.stats.AchievementsPage(data, nav)
                 is Screen.Wrapped -> WrappedPage(scr.year, data, nav)
                 is Screen.StatsPart -> app.pumpling.ui.stats.StatsPartPage(scr.part, data, nav)
             }

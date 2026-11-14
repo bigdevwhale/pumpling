@@ -199,7 +199,7 @@ jm_press	Жим JM	JM press	W	tri	chest	bar	push
 dip_machine	Отжимания в тренажёре	Seated dip machine	W	tri,chest		mach	push	брусья в тренажёре
 wide_pullup	Подтягивания широким хватом	Wide-grip pull-up	B	lats	upper,bi	bw	pull	широкие подтягивания
 neutral_pullup	Подтягивания параллельным хватом	Neutral-grip pull-up	B	lats,bi	upper	bw	pull	
-close_pulldown	Тяга верхнего блока узким хватом	Close-grip pulldown	W	lats	bi	cable	pull	узкая рукоять
+close_pulldown	Тяга верхнего блока узким хватом	Close-grip pulldown	W	lats	bi	cable	pull	узкая рукоять, тяга к груди узким хватом, тяга верхнего блока к груди узким хватом, узкий хват, v-рукоять, close grip lat pulldown, v-bar pulldown
 straight_arm_pulldown	Пуловер на блоке	Straight-arm pulldown	W	lats		cable	pull	тяга прямыми руками
 machine_row	Тяга в тренажёре	Machine row	W	upper,lats	bi	mach	pull	рычажная тяга, хаммер тяга
 chest_supported_row	Тяга с упором грудью	Chest-supported row	W	upper,lats	bi	db	pull	тяга на наклонной скамье

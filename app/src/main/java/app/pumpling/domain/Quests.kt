@@ -52,6 +52,21 @@ object Quests {
             if (w.work.groupBy { it.workoutId }.values.any { l -> l.map { Catalog.of(it.exId).cat }.toSet().size >= 3 }) 1.0 else 0.0 },
         Quest("holds", "3 минуты планки за неделю", "3 minutes of planks this week", 20, 180.0) { w ->
             w.work.filter { Catalog.of(it.exId).kind == Kind.HOLD }.sumOf { it.secs }.toDouble() },
+        Quest("three", "Три тренировки за неделю", "Three workouts this week", 25, 3.0) { w -> w.workouts.size.toDouble() },
+        Quest("five", "5 разных упражнений за одну тренировку", "5 different exercises in one workout", 20, 5.0) { w ->
+            (w.work.groupBy { it.workoutId }.values.maxOfOrNull { l -> l.map { it.exId }.distinct().size } ?: 0).toDouble() },
+        Quest("pr2", "Рекорды в двух упражнениях", "Records in two exercises", 35, 2.0) { w -> w.work.filter { it.pr.isNotEmpty() }.map { it.exId }.distinct().size.toDouble() },
+        Quest("cardio60", "Час кардио за неделю", "An hour of cardio this week", 25, 60.0) { w ->
+            w.work.filter { Catalog.of(it.exId).kind == Kind.CARDIO }.sumOf { it.secs } / 60.0 },
+        Quest("km10", "10 километров за неделю", "10 kilometres this week", 30, 10.0) { w -> w.work.sumOf { it.meters } / 1000 },
+        Quest("superset", "Сделать суперсет", "Do a superset", 15, 1.0) { w -> if (w.work.any { it.superset > 0 }) 1.0 else 0.0 },
+        Quest("class", "Сходить на групповое занятие", "Go to a group class", 15, 1.0) { w -> w.workouts.count { it.classOf.isNotEmpty() }.toDouble() },
+        Quest("sets40", "40 рабочих подходов за неделю", "40 working sets this week", 25, 40.0) { w -> w.work.count { it.side != 2 }.toDouble() },
+        Quest("pullups", "30 подтягиваний за неделю", "30 pull-ups this week", 20, 30.0) { w -> w.work.filter { it.exId in Tally.PULLUPS }.sumOf { it.reps }.toDouble() },
+        Quest("weekend", "Тренировка в выходной", "A workout at the weekend", 15, 1.0) { w ->
+            w.workouts.count { java.time.LocalDate.ofEpochDay(dayOf(it.start)).dayOfWeek.value >= 6 }.toDouble() },
+        Quest("bal", "Упражнение на баланс", "A balance exercise", 15, 1.0) { w -> w.catSets(Cat.BAL) },
+        Quest("jump", "5 подходов прыжков или ударов", "5 sets of jumps or strikes", 20, 5.0) { w -> w.catSets(Cat.JUMP) },
     )
     val byId = all.associateBy { it.id }
 

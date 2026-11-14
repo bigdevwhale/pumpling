@@ -27,7 +27,12 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.pumpling.BuildConfig
 import app.pumpling.container
+import app.pumpling.data.Backup
+import app.pumpling.data.Health
+import app.pumpling.work.Remind
+import app.pumpling.work.Rest
 import app.pumpling.data.OutsideSource
 import app.pumpling.domain.Lang
 import app.pumpling.currentLanguage
@@ -181,6 +186,36 @@ fun SettingsPage(d: Data, nav: Nav) {
     val s = d.s
     fun set(f: (app.pumpling.data.Settings) -> app.pumpling.data.Settings) = c.write { settings.update(f) }
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    val ctx = LocalContext.current
+    val io = kotlinx.coroutines.Dispatchers.IO
+    // the reminder follows its settings at once
+    fun remind(f: (app.pumpling.data.Settings) -> app.pumpling.data.Settings) = c.write { settings.update(f); Remind.schedule(app, settings.now()) }
+    val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+        if (!ok) c.say(tr("Без разрешения на уведомления напоминание не покажется", "Without the notification permission the reminder can't show")) }
+    // Health Connect: the switch turns on only when the access is really given
+    var healthOk by remember { mutableStateOf(Health.available(ctx)) }
+    fun syncHealth() = c.write {
+        val sets = dao.setList().groupBy { it.workoutId }
+        val n = kotlinx.coroutines.withContext(io) { Health.write(app, dao.workoutList().filter { it.end > 0 }.map { it to sets[it.id].orEmpty() }) }
+        say(tr("В Health Connect записано тренировок: $n", "Workouts written to Health Connect: $n")) }
+    val askHealth = androidx.activity.compose.rememberLauncherForActivityResult(Health.contract()) { granted ->
+        if (granted.containsAll(Health.PERMS)) { c.write { settings.update { it.copy(health = true) } }; syncHealth() }
+        else c.say(tr("Доступ к Health Connect не выдан", "Health Connect access wasn't given")) }
+    // the backup: a file the user saves wherever they like, and reads back from
+    var askRestore by remember { mutableStateOf(false) }
+    val saveBackup = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) c.write {
+            val ok = kotlinx.coroutines.withContext(io) { runCatching { app.contentResolver.openOutputStream(uri)!!.use { Backup.write(this@write, it, BuildConfig.VERSION_NAME) } }.isSuccess }
+            say(if (ok) tr("Копия сохранена", "Backup saved") else tr("Не получилось сохранить копию", "Couldn't save the backup")) } }
+    val openBackup = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) c.write {
+            val r = kotlinx.coroutines.withContext(io) { runCatching { app.contentResolver.openInputStream(uri)!!.use { Backup.read(this@write, it) } } }
+            val e = r.getOrNull()
+            if (e != null) { restored(); say(tr("Восстановлено тренировок: ${e.workouts.count { it.end > 0 }}, питомцев: ${e.pets.size}", "Restored: ${e.workouts.count { it.end > 0 }} workouts, ${e.pets.size} pets")) }
+            else say(when ((r.exceptionOrNull() as? Backup.Unreadable)?.newer) {
+                true -> tr("Копия сделана более новой версией – обновите приложение", "The backup is from a newer version – update the app")
+                false -> tr("Это не копия Pumpling", "This isn't a Pumpling backup")
+                null -> tr("Не получилось прочитать файл – данные не тронуты", "Couldn't read the file – nothing was changed") }) } }
     Page(tr("Настройки", "Settings"), { nav.pop() }) {
         // the tabs: big icons with labels
         Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -198,8 +233,48 @@ fun SettingsPage(d: Data, nav: Nav) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { (1..7).forEach { n -> Chip("$n", s.weekGoal == n) { set { it.copy(weekGoal = n) } } } } }
                 Setting(Icons.TARGET, C.gold, tr("Цель на год", "Year goal"), tr("Видна в «Летописи» за год – с прогнозом", "Shown in the year stats, with a forecast")) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(0, 50, 100, 150, 200).forEach { n -> Chip(if (n == 0) tr("нет", "none") else "$n", s.yearGoal == n) { set { it.copy(yearGoal = n) } } } } }
-                Setting(Icons.TIMER, C.acc, tr("Отдых между подходами", "Rest between sets"), tr("Таймер запускается, когда отмечаете подход", "Starts when you tick a set")) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(45, 60, 90, 120, 180).forEach { n -> Chip(app.pumpling.domain.clock(n), s.rest == n) { set { it.copy(rest = n) } } } } }
+                Setting(Icons.TIMER, C.acc, tr("Отдых между подходами", "Rest between sets"),
+                    if (s.rest > 0) tr("Таймер запускается, когда отмечаете подход", "Starts when you tick a set") else tr("Таймер выключен: подходы просто отмечаются", "The timer is off: sets are just ticked")) {
+                    Column {
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(0, 45, 60, 90, 120, 180).forEach { n -> Chip(if (n == 0) tr("выкл", "off") else app.pumpling.domain.clock(n), s.rest == n) { set { it.copy(rest = n) }; if (n == 0) Rest.stop(ctx) } } }
+                        if (s.rest > 0) {
+                            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) { Text(tr("Звук в конце отдыха", "A sound when the rest is over"), style = T.smallB)
+                                    Text(tr("Без звука телефон только вибрирует", "Without it the phone only buzzes"), style = T.tiny) }
+                                Chip(if (s.restSound) tr("да", "yes") else tr("нет", "no"), s.restSound) { set { it.copy(restSound = !it.restSound) } }
+                            }
+                            // Android 12+ may hold exact alarms back: then the signal can come late with the screen off
+                            var exact by remember { mutableStateOf(Rest.exact(ctx)) }
+                            androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { exact = Rest.exact(ctx); onPauseOrDispose { } }
+                            if (!exact) {
+                                Text(tr("С погашенным экраном сигнал может опоздать: телефон не разрешил приложению точные будильники.", "With the screen off the signal may come late: the phone hasn't allowed the app exact alarms."),
+                                    style = T.tiny.copy(color = C.bad), modifier = Modifier.padding(top = 10.dp))
+                                Ghost(tr("Разрешить точный сигнал", "Allow the exact signal"), Modifier.fillMaxWidth().padding(top = 6.dp), small = true) {
+                                    Rest.exactSettings(ctx)?.let { i -> runCatching { ctx.startActivity(i) } } }
+                            }
+                        }
+                    }
+                }
+                Setting(Icons.CLOCK, C.gold, tr("Напоминание о тренировке", "Workout reminder"),
+                    if (s.remindDays.isEmpty()) tr("Выберите дни – в них придёт одно уведомление", "Pick the days – one notification comes on each")
+                    else tr("Одно уведомление в выбранные дни, если тренировки ещё не было", "One notification on the chosen days, if you haven't trained yet")) {
+                    Column {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            (1..7).forEach { day -> val on = day in s.remindDays
+                                Box(Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(12.dp)).background(if (on) C.acc else C.card2).clickable {
+                                    if (!on && !Remind.canPost(ctx) && android.os.Build.VERSION.SDK_INT >= 33) askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                    remind { it.copy(remindDays = if (on) it.remindDays - day else it.remindDays + day) } }, contentAlignment = Alignment.Center) {
+                                    Text(app.pumpling.domain.dayShort(day - 1), style = T.smallB.copy(color = if (on) C.accInk else C.ink)) } }
+                        }
+                        if (s.remindDays.isNotEmpty()) Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(tr("Во сколько", "At"), style = T.smallB, modifier = Modifier.weight(1f))
+                            Chip("%d:%02d".format(s.remindAt / 60, s.remindAt % 60), true) {
+                                android.app.TimePickerDialog(ctx, { _, h, m -> remind { it.copy(remindAt = h * 60 + m) } }, s.remindAt / 60, s.remindAt % 60, true).show() }
+                        }
+                        if (s.remindDays.isNotEmpty() && s.sick > 0) Text(tr("Пока включён больничный, напоминания молчат", "While sick leave is on, the reminders stay quiet"), style = T.tiny, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
                 Setting(Icons.SCALE, C.mute, tr("Единицы", "Units")) {
                     Segments(listOf(tr("килограммы", "kilograms"), tr("фунты", "pounds")), if (s.lb) 1 else 0) { i -> set { it.copy(lb = i == 1) } } }
                 Setting(Icons.GYM, C.ok, tr("Свой инвентарь", "Own equipment"), tr("Появляется в своих упражнениях, фильтре и статистике", "Shows up in own exercises, the filter and the stats")) {
@@ -236,6 +311,23 @@ fun SettingsPage(d: Data, nav: Nav) {
                             listOf(7 to tr("неделя", "week"), 14 to tr("2 недели", "2 weeks"), 30 to tr("месяц", "month"), 0 to tr("нет", "no")).forEach { (n, l) -> Chip(l, s.checkIn == n) { set { it.copy(checkIn = n) } } } }
                         Ghost(tr("Открыть", "Open"), Modifier.fillMaxWidth(), small = true) { nav.push(Screen.BodyLog) }
                     } }
+                Setting(Icons.HEART, C.bad, "Health Connect", tr("Законченные тренировки видны другим приложениям здоровья на телефоне: когда, сколько длилась и какого вида. Pumpling оттуда ничего не читает.",
+                    "Finished workouts show up for other health apps on the phone: when, how long and what kind. Pumpling reads nothing from there.")) {
+                    Column {
+                        androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { healthOk = Health.available(ctx); onPauseOrDispose { } }
+                        if (!healthOk) {
+                            Text(if (Health.needsUpdate(ctx)) tr("Health Connect на этом телефоне нужно установить или обновить.", "Health Connect needs installing or updating on this phone.")
+                                else tr("На этом телефоне Health Connect недоступен.", "Health Connect isn't available on this phone."), style = T.small)
+                            if (Health.needsUpdate(ctx)) Ghost(tr("Открыть в магазине", "Open in the store"), Modifier.fillMaxWidth().padding(top = 8.dp), small = true) {
+                                runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=com.google.android.apps.healthdata")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+                        } else {
+                            Chip(if (s.health) tr("включено", "on") else tr("выключено", "off"), s.health, color = C.ok) {
+                                if (s.health) set { it.copy(health = false) }
+                                else c.write { if (Health.granted(app)) { settings.update { it.copy(health = true) }; syncHealth() } else runCatching { askHealth.launch(Health.PERMS) } } }
+                            if (s.health) Ghost(tr("Записать все прошлые тренировки заново", "Write all the past workouts again"), Modifier.fillMaxWidth().padding(top = 10.dp), small = true) { syncHealth() }
+                        }
+                    }
+                }
             }
             2 -> {
                 Setting(Icons.PALETTE, C.acc, tr("Тема", "Theme")) {
@@ -245,11 +337,15 @@ fun SettingsPage(d: Data, nav: Nav) {
                     Segments(listOf(tr("системный", "system"), "Русский", "English"), when (lang) { "ru" -> 1; "en" -> 2; else -> 0 }) { i -> setLanguage(listOf("", "ru", "en")[i]) } }
                 val o = app.pumpling.data.Outside.of(s.outside)
                 Setting(Icons.SUN, C.gold, tr("За окном зала", "Outside the gym window"),
-                    (if (s.town.isNotEmpty()) s.town else tr("Город не выбран", "No town chosen")) + (o?.let { " · ${weatherWord(it.weather)}" + (if (it.temp.isNaN()) "" else ", ${Math.round(it.temp)}°") } ?: "")) {
+                    (if (s.town.isNotEmpty()) s.town else tr("Город не выбран", "No town chosen")) + (o?.takeIf { s.weather }?.let { " · ${weatherWord(it.weather)}" + (if (it.temp.isNaN()) "" else ", ${Math.round(it.temp)}°") } ?: "")) {
                     Column {
                         var q by remember { mutableStateOf("") }
                         var found by remember { mutableStateOf<List<app.pumpling.data.Town>>(emptyList()) }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Segments(listOf(tr("настоящая погода", "the real weather"), tr("только время суток", "the time of day only")), if (s.weather) 0 else 1, Modifier.padding(bottom = 10.dp)) { i ->
+                            c.write { settings.update { it.copy(weather = i == 0, outside = if (i == 0) it.outside else "") }; if (i == 0) refreshOutside(true) } }
+                        if (!s.weather) Text(tr("Погода выключена: приложение не выходит в интернет. В окне – ясное небо и время суток" + (if (s.lat.isNaN()) "." else " по восходу и закату в выбранном городе, они считаются на телефоне."),
+                            "The weather is off: the app doesn't go online. The window shows a clear sky and the time of day" + (if (s.lat.isNaN()) "." else " by the sunrise and sunset in the chosen town, worked out on the phone.")), style = T.tiny)
+                        if (s.weather) Row(verticalAlignment = Alignment.CenterVertically) {
                             Field(q, { q = it }, tr("Другой город", "Another town"), Modifier.weight(1f))
                             Spacer(Modifier.width(8.dp))
                             Btn(tr("Найти", "Find"), small = true, enabled = q.isNotBlank()) { c.write {
@@ -258,7 +354,7 @@ fun SettingsPage(d: Data, nav: Nav) {
                         }
                         found.forEach { t -> Text("${t.name}, ${t.region}", style = T.body, modifier = Modifier.fillMaxWidth().clickable {
                             c.write { settings.update { it.copy(town = t.name, lat = t.lat, lon = t.lon, guessed = true, outside = "") }; refreshOutside(true) }; found = emptyList(); q = "" }.padding(vertical = 8.dp)) }
-                        Text(tr("Окно показывает время суток и погоду там. Отправляются только координаты города – в Open-Meteo или MET Norway.",
+                        if (s.weather) Text(tr("Окно показывает время суток и погоду там. Отправляются только координаты города – в Open-Meteo или MET Norway.",
                             "The window shows the time of day and the weather there. Only the town's coordinates are sent – to Open-Meteo or MET Norway."), style = T.tiny, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
@@ -287,15 +383,32 @@ fun SettingsPage(d: Data, nav: Nav) {
                         LinkRow(Icons.LIST, C.mute, tr("Исходный код", "Source code"), "GitHub", Community.CODE)
                     }
                 }
+                Setting(Icons.LIST, C.ok, tr("Резервная копия", "Backup"), tr("Все тренировки, программы, питомцы, замеры с фото и настройки – в одном файле. Сохраните его в облако или на компьютер: с ним всё вернётся на новом телефоне.",
+                    "Every workout, routine, pet, measurement with its photo and the settings, in one file. Keep it in a cloud or on a computer: it brings everything back on a new phone.")) {
+                    Column {
+                        Ghost(tr("Сохранить копию в файл", "Save a backup to a file"), Modifier.fillMaxWidth(), small = true) {
+                            runCatching { saveBackup.launch("pumpling-${java.time.LocalDate.now()}.zip") }.onFailure { c.say(tr("На телефоне нет приложения для выбора файла", "No app on the phone to pick a file with")) } }
+                        Ghost(tr("Восстановить из файла", "Restore from a file"), Modifier.fillMaxWidth().padding(top = 8.dp), small = true) { askRestore = true }
+                    }
+                }
                 Setting(Icons.SPARK, C.acc, tr("Подсказки", "Hints"), tr("Короткие пояснения на каждом экране", "A short note on every screen")) {
                     Ghost(tr("Показать заново", "Show again"), Modifier.fillMaxWidth(), small = true) { c.write { settings.update { it.copy(seen = emptySet()) } }; c.say(tr("Подсказки покажутся снова", "Hints will show again")) } }
                 Setting(Icons.STAR, C.gold, tr("Итоги года", "Year in review"), tr("Ваш год в сторис", "Your year as stories")) {
                     Ghost(tr("Листать", "Open"), Modifier.fillMaxWidth(), small = true) { nav.push(Screen.Wrapped(java.time.LocalDate.now().year)) } }
-                Setting(Icons.HOME, C.ok, tr("О приложении", "About"), tr("Pumpling работает без аккаунта. Все тренировки и питомцы хранятся только на телефоне; в интернет уходят лишь координаты города для погоды.",
-                    "Pumpling needs no account. Workouts and pets stay on the phone; only the town's coordinates go online, for the weather."))
+                Setting(Icons.HOME, C.ok, tr("О приложении", "About"), tr("Pumpling работает без аккаунта. Все тренировки и питомцы хранятся только на телефоне; в интернет уходят лишь координаты города для погоды – её можно выключить на вкладке «Вид».",
+                    "Pumpling needs no account. Workouts and pets stay on the phone; only the town's coordinates go online, for the weather – which can be turned off under «Look»."))
                 Text(tr("Контуры карты мышц – react-native-body-highlighter, MIT © 2022 ELABBASSI Hicham. Погода – Open-Meteo и MET Norway.", "Muscle map outlines: react-native-body-highlighter, MIT © 2022 ELABBASSI Hicham. Weather: Open-Meteo and MET Norway."), style = T.tiny, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
             }
         }
+    }
+    if (askRestore) Popup({ askRestore = false }) {
+        Text(tr("Восстановить из копии?", "Restore from a backup?"), style = T.h2)
+        Text(tr("Всё, что сейчас в приложении, – тренировки, питомцы, программы, замеры и настройки – заменится тем, что в файле. Отменить это нельзя. Если здесь есть что терять, сначала сохраните копию.",
+            "Everything in the app now – workouts, pets, routines, measurements and settings – is replaced with what's in the file. This can't be undone. If there's anything to lose here, save a backup first."),
+            style = T.body, modifier = Modifier.padding(vertical = 10.dp))
+        Btn(tr("Выбрать файл и заменить", "Pick a file and replace"), Modifier.fillMaxWidth(), color = C.bad) { askRestore = false
+            runCatching { openBackup.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) }.onFailure { c.say(tr("На телефоне нет приложения для выбора файла", "No app on the phone to pick a file with")) } }
+        Spacer(Modifier.height(8.dp)); Ghost(tr("Отмена", "Cancel"), Modifier.fillMaxWidth()) { askRestore = false }
     }
 }
 

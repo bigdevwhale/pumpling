@@ -125,6 +125,7 @@ fun StatsScreen(d: Data, nav: Nav) {
             Section(icon = Icons.DOTS, text = tr("Ещё", "More"))
             Card(pad = 4.dp) {
                 Row2(tr("Подробные цифры", "All the numbers"), tr("время, плотность, самые-самые", "time, density, extremes"), null, Modifier.padding(horizontal = 12.dp), lead = { app.pumpling.ui.components.Badge(Icons.LIST) }) { nav.push(Screen.StatsPart(4)) }
+                Row2(tr("Достижения", "Achievements"), tr("${d.s.achieved.size} из ${app.pumpling.domain.Achievements.total} ступеней", "${d.s.achieved.size} of ${app.pumpling.domain.Achievements.total} tiers"), null, Modifier.padding(horizontal = 12.dp), lead = { app.pumpling.ui.components.Badge(Icons.TROPHY, C.gold) }) { nav.push(Screen.Achievements) }
                 Row2(tr("Итоги года", "Year in review"), tr("листайте как сторис", "swipe like stories"), null, Modifier.padding(horizontal = 12.dp), lead = { app.pumpling.ui.components.Badge(Icons.SPARK, C.gold) }) { nav.push(Screen.Wrapped(LocalDate.ofEpochDay(st.span.to.coerceAtMost(app.pumpling.domain.today())).year)) }
                 Row2(tr("Вес и замеры", "Weight and measurements"), null, null, Modifier.padding(horizontal = 12.dp), lead = { app.pumpling.ui.components.Badge(Icons.SCALE, C.ok) }) { nav.push(Screen.BodyLog) }
             }

@@ -25,7 +25,7 @@ data class Settings(
     val questWeek: Long = 0,                    // Monday of the week quests were dealt
     val quests: List<String> = emptyList(),     // quest ids this week
     val questsDone: Set<String> = emptySet(),
-    val rest: Int = 90,                         // default rest, seconds
+    val rest: Int = 90,                         // default rest, seconds; 0 = no rest timer at all
     val restSound: Boolean = true,
     val sick: Long = 0,                         // «on sick leave» since this day; 0 = not
     val sickDays: Set<Long> = emptySet(),       // days spent on sick leave (not counted against anything)
@@ -42,6 +42,11 @@ data class Settings(
     val gear: List<String> = emptyList(),       // the user's own equipment, by name
     val goals: Set<String> = emptySet(),        // Goal names
     val checkIn: Int = 0,                       // weigh and measure every this many days; 0 = never ask
+    val weather: Boolean = true,                // the real weather in the window; off = nothing goes online
+    val remindDays: Set<Int> = emptySet(),      // days to remind about a workout, 1 Monday .. 7 Sunday; empty = never
+    val remindAt: Int = 18 * 60,                // minutes after midnight the reminder comes at
+    val health: Boolean = false,                // finished workouts are written to Health Connect
+    val achieved: Set<String> = emptySet(),     // achievement tiers paid: «workouts:2»
 ) {
     fun json(): JSONObject = JSONObject().apply {
         put("onboarded", onboarded); put("plates", plates); put("items", JSONArray(items.toList())); put("hidden", JSONArray(hidden.toList()))
@@ -50,6 +55,7 @@ data class Settings(
         put("sick", sick); put("sickDays", JSONArray(sickDays.toList())); put("inbox", JSONArray(inbox)); put("seen", JSONArray(seen.toList()))
         put("yearGoal", yearGoal); put("bar", bar); put("plateSet", plateSet); put("cardBg", cardBg); put("hideWeights", hideWeights)
         put("town", town); if (!lat.isNaN()) { put("lat", lat); put("lon", lon) }; put("guessed", guessed); put("outside", outside); put("gear", JSONArray(gear)); put("goals", JSONArray(goals.toList())); put("checkIn", checkIn)
+        put("weather", weather); put("remindDays", JSONArray(remindDays.toList())); put("remindAt", remindAt); put("health", health); put("achieved", JSONArray(achieved.toList()))
     }
 
     companion object {
@@ -61,7 +67,9 @@ data class Settings(
                 j.optLong("questWeek"), list("quests"), set("questsDone"), j.optInt("rest", 90), j.optBoolean("restSound", true),
                 j.optLong("sick"), list("sickDays").mapNotNull { it.toLongOrNull() }.toSet(), list("inbox"), set("seen"), j.optInt("yearGoal"),
                 j.optDouble("bar", 20.0), j.optString("plateSet", "25,20,15,10,5,2.5,1.25"), j.optInt("cardBg"), j.optBoolean("hideWeights"),
-                j.optString("town"), j.optDouble("lat", Double.NaN), j.optDouble("lon", Double.NaN), j.optBoolean("guessed"), j.optString("outside"), list("gear"), set("goals"), j.optInt("checkIn"))
+                j.optString("town"), j.optDouble("lat", Double.NaN), j.optDouble("lon", Double.NaN), j.optBoolean("guessed"), j.optString("outside"), list("gear"), set("goals"), j.optInt("checkIn"),
+                j.optBoolean("weather", true), (j.optJSONArray("remindDays")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: emptyList()).toSet(),
+                j.optInt("remindAt", 18 * 60), j.optBoolean("health"), set("achieved"))
         }
     }
 }

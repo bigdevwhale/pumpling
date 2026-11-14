@@ -67,6 +67,8 @@ class Weeks(days: Set<Long>, val goal: Int, sick: Set<Long>) {
 data class Outcome(
     val food: Double, val plates: Int, val records: List<Pair<WSet, Rec>>, val eggs: List<String>, val hatched: List<Pet>,
     val quests: List<Quest>, val newEx: List<String>, val shares: Map<Long, Double>, val bonus: List<String>,
+    /** Achievement tiers this workout reached, with the tier's number. */
+    val achievements: List<Pair<Achievement, Int>> = emptyList(),
 )
 
 object Engine {

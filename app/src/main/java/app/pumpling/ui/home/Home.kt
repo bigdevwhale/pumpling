@@ -104,6 +104,7 @@ fun HomeScreen(d: Data, nav: Nav) {
             CheckInCard(d, nav)
             QuestFold(d)
             FreshFold(d)
+            AchievementsRow(d, nav)
         }
     }
 }
@@ -208,6 +209,27 @@ private fun FreshFold(d: Data) {
             }
         line(tr("Отдыхают", "Resting"), C.acc, tired, tr("никто – все отдохнули", "none – all rested"))
         line(tr("Готовы к работе", "Ready to work"), C.ok, fresh, tr("пока никто", "none yet"))
+    }
+}
+
+/** The long-term achievements in one line: how many tiers are reached and the one nearest to the next. */
+@Composable
+private fun AchievementsRow(d: Data, nav: Nav) {
+    if (d.finished.isEmpty()) return
+    val near = remember(d.finished, d.doneSets, d.pets, d.s.items, d.bodies.size) {
+        val data = app.pumpling.domain.AchData(app.pumpling.domain.Tally(d.finished, d.doneSets, d.s), d.pets, d.s, d.bodies.size)
+        app.pumpling.domain.Achievements.all.mapNotNull { a -> val v = a.value(data); val l = a.level(v)
+            if (l >= a.tiers.size) null else Triple(a, a.tiers[l], (v / a.tiers[l]).toFloat().coerceIn(0f, 1f)) }.maxByOrNull { it.third }
+    }
+    Row(Modifier.padding(top = 10.dp).fillMaxWidth().card(20.dp).clickable { nav.push(Screen.Achievements) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        app.pumpling.ui.components.Badge(Icons.TROPHY, C.gold, 40.dp)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(tr("Достижения · ${d.s.achieved.size} из ${app.pumpling.domain.Achievements.total}", "Achievements · ${d.s.achieved.size} of ${app.pumpling.domain.Achievements.total}"), style = T.bodyB)
+            near?.let { (a, next, p) ->
+                Text(tr("Ближе всего: ", "Nearest: ") + a.label.lowercase() + " · " + a.show(next), style = T.small, maxLines = 1)
+                Meter(p, Modifier.padding(top = 6.dp), color = C.gold, h = 5.dp) }
+        }
+        Icon(Icons.NEXT, C.mute, 18.dp)
     }
 }
 

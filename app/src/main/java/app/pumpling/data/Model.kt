@@ -172,6 +172,13 @@ interface Dao0 {
     @Update suspend fun update(p: Pet)
     @Update suspend fun updatePets(p: List<Pet>)
 
+    // a backup read back: rows keep their ids
+    @Insert suspend fun insertWorkouts(l: List<Workout>)
+    @Insert suspend fun insertOwn(l: List<OwnEx>)
+    @Insert suspend fun insertRoutines(l: List<Routine>)
+    @Insert suspend fun insertBodies(l: List<Body>)
+    @Insert suspend fun insertPets(l: List<Pet>)
+
     @Query("DELETE FROM Workout") suspend fun clearWorkouts()
     @Query("DELETE FROM WSet") suspend fun clearSets()
     @Query("DELETE FROM Pet") suspend fun clearPets()

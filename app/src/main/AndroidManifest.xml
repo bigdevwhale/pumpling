@@ -4,8 +4,19 @@
     <!-- The rest timer: a count-down notification and a buzz when the rest is over. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The end of a rest to the second. Android 14+ grants it only when the user allows «Alarms & reminders». -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- The workout reminder is set again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Finished workouts written to Health Connect, when the user turns it on. Nothing is read. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
     <!-- The real weather and sky in the gym window: only the town's coordinates are sent. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Health Connect before Android 14 is a separate app. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <application
         android:name=".PumplingApp"
@@ -28,10 +39,37 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- «Why does this app want Health Connect?» on Android 13 and older: the privacy note opens. -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!-- The same question on Android 14+. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Rings when a rest is over, even with the app in the background. -->
         <receiver android:name=".work.RestAlarm" android:exported="false" />
+
+        <!-- The workout reminder on the chosen days, and setting it again after a restart or an update. -->
+        <receiver android:name=".work.RemindAlarm" android:exported="false" />
+        <receiver android:name=".work.RemindBoot" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Cards to share and progress photos from the system camera go through this. -->
         <provider

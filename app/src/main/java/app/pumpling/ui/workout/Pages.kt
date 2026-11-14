@@ -244,6 +244,9 @@ fun ResultPage(r: Screen.Result, d: Data, nav: Nav) {
                 Text(tr("Яйцо! ", "An egg! ") + app.pumpling.domain.Pets.of(e).find, style = T.body, modifier = Modifier.padding(start = 8.dp)) } } } }
         if (o.hatched.isNotEmpty()) { Section(icon = Icons.EGG, text = tr("Вылупились", "Hatched")); Card { o.hatched.forEach { Text("${it.name} – ${it.sp().name}", style = T.bodyB) } } }
         if (o.quests.isNotEmpty()) { Section(icon = Icons.TARGET, text = tr("Задания", "Quests")); Card { o.quests.forEach { Text("✓ ${it.label}  +${it.plates}", style = T.bodyB.copy(color = C.ok)) } } }
+        if (o.achievements.isNotEmpty()) { Section(icon = Icons.TROPHY, text = tr("Достижения", "Achievements"))
+            Card(onClick = { nav.push(Screen.Achievements) }) { o.achievements.forEach { (a, l) ->
+                Text("★ ${a.label} · ${a.show(a.tiers[l - 1])}  +${app.pumpling.domain.Achievements.plates(l)}", style = T.bodyB.copy(color = C.gold)) } } }
         if (o.newEx.isNotEmpty() && d.finished.size > 1) Text(tr("Новые упражнения: ", "New exercises: ") + o.newEx.joinToString(", ") { Catalog.of(it).name }, style = T.small, modifier = Modifier.padding(top = 12.dp))
         Spacer(Modifier.height(18.dp))
         Btn(tr("Поделиться открыткой", "Share a card"), Modifier.fillMaxWidth()) { nav.share = ShareReq(CardKind.WORKOUT, r.workoutId) }
@@ -251,7 +254,7 @@ fun ResultPage(r: Screen.Result, d: Data, nav: Nav) {
             var saved by remember { mutableStateOf(false) }
             Ghost(if (saved) tr("Сохранено в программы ✓", "Saved to routines ✓") else tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
                 if (!saved) { saved = true; val sets = d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup }
-                    val plans = sets.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs) }
+                    val plans = sets.groupBy { it.block }.toSortedMap().values.map { l -> Plan(l.first().exId, l.count { it.side != 2 }, l.first().reps, l.first().weight, l.first().secs, l.first().superset) }
                     ctx.container.write { dao.insert(Routine(name = w.title.ifEmpty { tr("Программа", "Routine") }, items = Plan.join(plans), created = System.currentTimeMillis()))
                         say(tr("Программа «${w.title}» сохранена – она в журнале", "Routine «${w.title}» saved – find it in the log")) } } } }
         Spacer(Modifier.height(8.dp))
