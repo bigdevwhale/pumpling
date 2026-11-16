@@ -6,6 +6,17 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.5.0] - 2026-11-16
+
+### Added
+- **Lingvale, the village of the pets from all our apps:** Pumpling now has a small read-only bridge, so in Lingvale you can build the basement gym and its residents move in with their days. The bridge answers only Lingvale signed with our key; it changes nothing and nothing leaves the phone.
+
+<!-- tg
+Питомцы Pumpling теперь могут жить в Lingvale – общей деревне наших приложений.
+В Lingvale для них можно построить подвальный зал, и жильцы переедут туда сами вместе со своими днями.
+Данные остаются в Pumpling: деревня их только читает.
+-->
+
 ## [1.4.0] - 2026-11-14
 
 ### Added
