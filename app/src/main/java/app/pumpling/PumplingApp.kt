@@ -1,5 +1,6 @@
 package app.pumpling
 
+import app.pumpling.domain.Place
 import android.app.Application
 import android.content.Context
 import app.pumpling.data.Body
@@ -81,7 +82,7 @@ class AppContainer(context: Context) {
     // ---------- the workout ----------
     suspend fun start(routine: Routine? = null, at: Long = System.currentTimeMillis()): Long {
         dao.liveNow()?.let { return it.id }
-        val id = dao.insert(Workout(start = at, title = routine?.name.orEmpty(), routineId = routine?.id ?: 0))
+        val id = dao.insert(Workout(start = at, title = routine?.name.orEmpty(), routineId = routine?.id ?: 0, place = placeFor(routine?.id ?: 0, "")))
         if (routine != null) {
             val last = lastSets()
             val sets = Plan.parse(routine.items).flatMapIndexed { b, p ->
@@ -102,9 +103,15 @@ class AppContainer(context: Context) {
     /** A group class: a workout with one timed «set» of [exId], filled in when it ends (#10). */
     suspend fun startClass(exId: String, title: String, at: Long = System.currentTimeMillis()): Long {
         dao.liveNow()?.let { return it.id }
-        val id = dao.insert(Workout(start = at, title = title.trim(), classOf = exId))
+        val id = dao.insert(Workout(start = at, title = title.trim(), classOf = exId, place = placeFor(0, exId)))
         dao.insertSets(listOf(WSet(workoutId = id, exId = exId, block = 0, idx = 0)))
         return id
+    }
+
+    /** Where a new workout probably is (#13): where this routine or class was last time, else where the last workout was. */
+    private suspend fun placeFor(routineId: Long, classOf: String): String {
+        val done = dao.workoutList().filter { it.end > 0 && Place.of(it.place) != null }   // newest first
+        return (done.firstOrNull { (routineId != 0L && it.routineId == routineId) || (classOf.isNotEmpty() && it.classOf == classOf) } ?: done.firstOrNull())?.place.orEmpty()
     }
 
     /** Writes how a class went into its timed set and the workout, before [finish]. */
@@ -167,7 +174,7 @@ class AppContainer(context: Context) {
 
     private class Finished(val w: Workout, val sets: List<WSet>, val out: Outcome, val week: Long, val questIds: List<String>, val doneBefore: Set<String>)
 
-    suspend fun finish(workoutId: Long, title: String, note: String, feel: Int, end: Long = System.currentTimeMillis()): Outcome? = lock.withLock {
+    suspend fun finish(workoutId: Long, title: String, note: String, feel: Int, end: Long = System.currentTimeMillis(), place: String = ""): Outcome? = lock.withLock {
         val s = settings.now()
         // Everything in the database changes together or not at all: pets fed without the workout closed would be fed again.
         val f = db.withTransaction {
@@ -190,7 +197,7 @@ class AppContainer(context: Context) {
             val (out0, fed) = Engine.feed(w, marked, before, beforeSets, pets, s)
             dao.updatePets(fed)
             val leader = Engine.team(fed).firstOrNull()?.species.orEmpty()
-            val finished = w.copy(end = maxOf(end, w.start + 60_000), title = title.trim(), note = note.trim(), feel = feel,
+            val finished = w.copy(end = maxOf(end, w.start + 60_000), title = title.trim(), note = note.trim(), feel = feel, place = place.trim(),
                 food = out0.food, prs = out0.records.map { it.first.exId to it.second }.distinct().size, leader = leader)
             // eggs found
             val tally = Tally(all + finished, allSets.filter { it.workoutId != workoutId && it.workoutId in (all.map { it.id }.toSet()) } + marked, s)
@@ -245,13 +252,13 @@ class AppContainer(context: Context) {
      * Ends the editing of a finished workout: unticked sets go, the details are saved and records are
      * marked again. What the pets ate stays as it was. Returns false when no set is left and the workout is deleted.
      */
-    suspend fun saveEdit(workoutId: Long, title: String, note: String, feel: Int, start: Long, end: Long): Boolean = lock.withLock {
+    suspend fun saveEdit(workoutId: Long, title: String, note: String, feel: Int, start: Long, end: Long, place: String? = null): Boolean = lock.withLock {
         val kept = db.withTransaction {
             val w = dao.workout(workoutId) ?: return@withTransaction null
             val mine = dao.setsOfNow(workoutId)
             mine.filter { !it.done }.forEach { dao.deleteSet(it.id) }
             if (mine.none { it.done }) { dao.deleteWorkout(workoutId); remark(w.start); return@withTransaction null }
-            val now = w.copy(title = title.trim(), note = note.trim(), feel = feel, start = start, end = maxOf(end, start + 60_000))
+            val now = w.copy(title = title.trim(), note = note.trim(), feel = feel, place = place?.trim() ?: w.place, start = start, end = maxOf(end, start + 60_000))
             dao.update(now)
             remark(minOf(w.start, start))
             now

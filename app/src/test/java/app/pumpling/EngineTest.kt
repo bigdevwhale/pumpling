@@ -157,4 +157,9 @@ class EngineTest {
         assertTrue(app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8).copy(side = 1)).startsWith(app.pumpling.domain.sideMark(1)))
         assertEquals(app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8)), app.pumpling.domain.setLine(ex, set(1, 1, "squat", 20.0, 8).copy(side = 0)))
     }
+
+    @Test fun placeCodes() {   // #13
+        assertEquals(app.pumpling.domain.Place.STREET, app.pumpling.domain.Place.of("street"))
+        assertEquals(null, app.pumpling.domain.Place.of(""))
+    }
 }

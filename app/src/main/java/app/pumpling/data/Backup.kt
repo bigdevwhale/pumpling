@@ -33,9 +33,9 @@ object Backup {
     private fun <T> list(j: JSONObject, k: String, f: (JSONObject) -> T): List<T> = j.optJSONArray(k)?.let { a -> (0 until a.length()).map { f(a.getJSONObject(it)) } } ?: emptyList()
 
     private fun Workout.json() = JSONObject().put("id", id).put("start", start).put("end", end).put("title", title).put("note", note).put("routineId", routineId)
-        .put("food", food).put("plates", plates).put("prs", prs).put("leader", leader).put("feel", feel).put("manual", manual).put("classOf", classOf).put("muscles", muscles)
+        .put("food", food).put("plates", plates).put("prs", prs).put("leader", leader).put("feel", feel).put("manual", manual).put("classOf", classOf).put("muscles", muscles).put("place", place)
     private fun workout(j: JSONObject) = Workout(j.getLong("id"), j.getLong("start"), j.optLong("end"), j.optString("title"), j.optString("note"), j.optLong("routineId"),
-        j.optDouble("food", 0.0), j.optInt("plates"), j.optInt("prs"), j.optString("leader"), j.optInt("feel"), j.optBoolean("manual"), j.optString("classOf"), j.optString("muscles"))
+        j.optDouble("food", 0.0), j.optInt("plates"), j.optInt("prs"), j.optString("leader"), j.optInt("feel"), j.optBoolean("manual"), j.optString("classOf"), j.optString("muscles"), j.optString("place"))
 
     private fun WSet.json() = JSONObject().put("id", id).put("workoutId", workoutId).put("exId", exId).put("block", block).put("idx", idx).put("weight", weight).put("reps", reps)
         .put("secs", secs).put("meters", meters).put("rpe", rpe).put("warmup", warmup).put("done", done).put("doneAt", doneAt).put("pr", pr).put("superset", superset).put("side", side)

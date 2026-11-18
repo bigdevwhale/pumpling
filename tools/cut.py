@@ -3,7 +3,7 @@
     python tools/cut.py
 
 Pets (3×2): pet_<id>_<0..5>.webp – baby, teen, adult, signature move, cheer, asleep.
-Items (4×4): item_<id>.webp. Eggs (5×4): egg_<species>.webp. Gym: gym_bg.webp.
+Items (4×4): item_<id>.webp. Eggs (5×4): egg_<species>.webp. Gym: gym_bg.webp, home_bg.webp, street_bg.webp.
 The magenta background is keyed out; each frame is cropped to its creature.
 """
 from pathlib import Path
@@ -82,6 +82,12 @@ def main():
         g = g.resize((960, round(960 * g.height / g.width)), Image.LANCZOS)
         g.save(OUT / "gym_bg.webp", "WEBP", quality=88, method=6)
         print("gym")
+    for place in ("home", "street"):   # the other places a workout can be (#13)
+        if (SHEETS / f"{place}.png").exists():
+            g = Image.open(SHEETS / f"{place}.png").convert("RGB")
+            g = g.resize((960, round(960 * g.height / g.width)), Image.LANCZOS)
+            g.save(OUT / f"{place}_bg.webp", "WEBP", quality=88, method=6)
+            print(place)
     exercises()
 
 

@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -190,15 +191,17 @@ fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun Field(value: String, onChange: (String) -> Unit, hint: String, modifier: Modifier = Modifier, number: Boolean = false, style: TextStyle = T.body, single: Boolean = true, center: Boolean = false) {
+fun Field(value: String, onChange: (String) -> Unit, hint: String, modifier: Modifier = Modifier, number: Boolean = false, style: TextStyle = T.body, single: Boolean = true, center: Boolean = false, autoFocus: Boolean = false) {
     var tv by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(value)) }
     if (tv.text != value) tv = tv.copy(text = value, selection = androidx.compose.ui.text.TextRange(value.length))
     var focused by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     // a number is usually replaced, not edited: tapping it selects all of it
     androidx.compose.runtime.LaunchedEffect(focused) { if (focused && number) { kotlinx.coroutines.delay(40); tv = tv.copy(selection = androidx.compose.ui.text.TextRange(0, tv.text.length)) } }
+    val focus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    if (autoFocus) androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
     Box(modifier.clip(RoundedCornerShape(12.dp)).background(C.card2).padding(horizontal = 12.dp, vertical = 11.dp)) {
         if (value.isEmpty()) Text(hint, style = style.copy(color = C.mute), modifier = if (center) Modifier.fillMaxWidth() else Modifier, textAlign = if (center) TextAlign.Center else null)
-        BasicTextField(tv, { tv = it; if (it.text != value) onChange(it.text) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }, textStyle = style.copy(color = C.ink, textAlign = if (center) TextAlign.Center else TextAlign.Start), singleLine = single,
+        BasicTextField(tv, { tv = it; if (it.text != value) onChange(it.text) }, modifier = Modifier.fillMaxWidth().focusRequester(focus).onFocusChanged { focused = it.isFocused }, textStyle = style.copy(color = C.ink, textAlign = if (center) TextAlign.Center else TextAlign.Start), singleLine = single,
             keyboardOptions = if (number) KeyboardOptions(keyboardType = KeyboardType.Decimal) else KeyboardOptions.Default, cursorBrush = SolidColor(C.acc))
     }
 }

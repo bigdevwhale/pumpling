@@ -6,6 +6,19 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.6.0] - 2026-11-18
+
+### Added
+- **Places: home, the gym or outside (#13).** Pick it at the start of a workout («Where:» under the team) and change it when finishing or editing; the app suggests where the same routine was last time. The pets train there too: in the basement gym, in a cozy room at home or in a park outside, which darkens at night. The log can show the workouts of one place only, and the place is in the history and the backup file.
+
+### Changed
+- **Any time and any length for a past workout (#12).** The start is picked on a clock to the minute and the day in a calendar (or «today» / «yesterday»); the length is 15–90 minutes in a tap or any number typed in. Editing a finished workout uses the same.
+
+<!-- tg
+Новое: место тренировки – дом, зал или улица. Питомцы тренируются там же: в комнате, в зале или в парке, а в журнале есть фильтр по месту.
+Прошедшую тренировку можно записать с любым временем начала и любой длительностью – хоть 16 минут.
+-->
+
 ## [1.5.0] - 2026-11-16
 
 ### Added

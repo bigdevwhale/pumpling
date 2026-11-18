@@ -122,6 +122,11 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
             Btn(if (edit) tr("Сохранить", "Save") else tr("Готово", "Finish"), small = true, color = C.ok) { finishing = true }
         }
         if (!edit) TeamStrip(d, sets)
+        // where it is: the pets move there too (#13)
+        if (!edit) Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("Где:", "Where:"), style = T.small, modifier = Modifier.padding(end = 8.dp))
+            app.pumpling.ui.components.PlacePick(w.place) { p -> c.write { dao.setPlace(w.id, p) } }
+        }
         if (isClass && !listing) ClassBody(w, d, now, onList = { listing = true }, onCancel = { cancel = true }) else
         LazyColumn(Modifier.weight(1f).fillMaxWidth().imePadding(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 120.dp)) {
             if (edit) item {
@@ -213,7 +218,7 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
         Btn(tr("Отменить тренировку", "Cancel it"), Modifier.fillMaxWidth(), color = C.bad) { c.write { dao.deleteSetsOf(w.id); dao.deleteWorkout(w.id); Rest.stop(app) }; cancel = false; nav.pop() }
         Spacer(Modifier.height(8.dp)); Ghost(tr("Продолжить тренировку", "Keep training"), Modifier.fillMaxWidth()) { cancel = false }
     }
-    if (finishing) { if (edit) EditSheet(w, nav) { finishing = false } else FinishSheet(d, nav) { finishing = false } }
+    if (finishing) { if (edit) EditSheet(w, d, nav) { finishing = false } else FinishSheet(d, nav) { finishing = false } }
 }
 
 /** Moves an exercise block up or down in the live workout. */
@@ -394,6 +399,7 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
     var feel by remember { mutableStateOf(0) }
     var mins by remember { mutableStateOf(60) }
     val isClass = w.classOf.isNotEmpty()
+    var place by remember { mutableStateOf(w.place) }
     var hard by remember { mutableStateOf(0) }
     var muscles by remember { mutableStateOf(Catalog.of(w.classOf.ifEmpty { "group_class" }).muscles.toSet()) }
     val done = d.setsBy[w.id].orEmpty().count { it.done } + if (isClass) 1 else 0
@@ -421,9 +427,11 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 app.pumpling.domain.Muscle.entries.forEach { m -> app.pumpling.ui.components.Chip(m.label, m in muscles) { muscles = if (m in muscles) muscles - m else muscles + m } } }
         }
+        Text(tr("Где?", "Where?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        app.pumpling.ui.components.PlacePick(place) { place = it }
         if (w.manual) {
-            Text(tr("Сколько длилась?", "How long was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(30, 45, 60, 75, 90, 120).forEach { m -> app.pumpling.ui.components.Chip("$m", mins == m) { mins = m } } }
+            Text(tr("Сколько длилась, минут?", "How long was it, minutes?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            app.pumpling.ui.components.MinutesPick(mins) { mins = it }
         }
         Spacer(Modifier.height(16.dp))
         Btn(tr("Закончить", "Finish"), Modifier.fillMaxWidth(), color = C.ok) {
@@ -431,7 +439,7 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
             val picked = app.pumpling.domain.Muscle.entries.filter { m -> m in muscles }
             c.write { val end = if (w.manual) w.start + mins * 60_000L else System.currentTimeMillis()
                 if (isClass) closeClass(w.id, hard, picked, end)
-                val out = finish(w.id, title, note, feel, end)
+                val out = finish(w.id, title, note, feel, end, place)
                 nav.pop(); if (out != null) nav.push(Screen.Result(w.id, out)) else say(tr("Пустая тренировка не сохранена", "An empty workout isn't saved")) }
         }
     }
@@ -439,7 +447,7 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
 
 /** Saving an edited workout: its name, note and feel, and when it was and how long it took. */
 @Composable
-private fun EditSheet(w: app.pumpling.data.Workout, nav: Nav, onClose: () -> Unit) {
+private fun EditSheet(w: app.pumpling.data.Workout, d: Data, nav: Nav, onClose: () -> Unit) {
     val c = LocalContext.current.container
     var title by remember { mutableStateOf(w.title) }
     var note by remember { mutableStateOf(w.note) }
@@ -449,6 +457,7 @@ private fun EditSheet(w: app.pumpling.data.Workout, nav: Nav, onClose: () -> Uni
     var day by remember { mutableLongStateOf(t0.toLocalDate().toEpochDay()) }
     var mins0 by remember { mutableStateOf(t0.hour * 60 + t0.minute) }
     var mins by remember { mutableStateOf(maxOf(1L, (w.end - w.start) / 60_000).toInt()) }
+    var place by remember { mutableStateOf(w.place) }
     Sheet(onClose) {
         Text(tr("Сохранить изменения", "Save the changes"), style = T.h2)
         Spacer(Modifier.height(12.dp))
@@ -460,29 +469,22 @@ private fun EditSheet(w: app.pumpling.data.Workout, nav: Nav, onClose: () -> Uni
             listOf("😫", "😕", "🙂", "😄", "🔥").forEachIndexed { i, e ->
                 Box(Modifier.size(48.dp).clip(CircleShape).background(if (feel == i + 1) C.accSoft else C.card2).clickable { feel = if (feel == i + 1) 0 else i + 1 }, contentAlignment = Alignment.Center) { Text(e, style = T.h2) } }
         }
-        Text(tr("Когда", "When"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-        Stepper(app.pumpling.domain.fmtDayYear(day), { day = minOf(app.pumpling.domain.today(), day + it) })
-        Spacer(Modifier.height(6.dp))
-        Stepper(tr("начало ", "start ") + "%d:%02d".format(mins0 / 60, mins0 % 60), { mins0 = (mins0 + it * 15 + 1440) % 1440 })
-        Spacer(Modifier.height(6.dp))
-        Stepper(tr("длилась $mins мин", "$mins min long"), { mins = (mins + it * 5).coerceIn(5, 600) })
+        Text(tr("Где?", "Where?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        app.pumpling.ui.components.PlacePick(place) { place = it }
+        Text(tr("Когда началась", "When it started"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            app.pumpling.ui.components.DayPick(day) { day = it }
+            app.pumpling.ui.components.TimePick(mins0) { mins0 = it }
+        }
+        Text(tr("Сколько длилась, минут?", "How long was it, minutes?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        app.pumpling.ui.components.MinutesPick(mins) { mins = it }
         Spacer(Modifier.height(16.dp))
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), color = C.ok) {
             val start = java.time.LocalDate.ofEpochDay(day).atStartOfDay(zone).toInstant().toEpochMilli() + mins0 * 60_000L
             onClose()
-            c.write { if (saveEdit(w.id, title, note, feel, start, start + mins * 60_000L)) say(tr("Тренировка сохранена", "Workout saved")) else say(tr("Подходов не осталось – тренировка удалена", "No sets left – the workout is deleted")) }
+            c.write { if (saveEdit(w.id, title, note, feel, start, start + mins * 60_000L, place)) say(tr("Тренировка сохранена", "Workout saved")) else say(tr("Подходов не осталось – тренировка удалена", "No sets left – the workout is deleted")) }
             nav.pop()
         }
-    }
-}
-
-/** «‹ value ›»: a value stepped down and up. */
-@Composable
-private fun Stepper(text: String, onStep: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.card2), verticalAlignment = Alignment.CenterVertically) {
-        Text("−", style = T.h2.copy(color = C.acc), modifier = Modifier.clickable { onStep(-1) }.padding(horizontal = 18.dp, vertical = 8.dp))
-        Text(text, style = T.bodyB, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-        Text("+", style = T.h2.copy(color = C.acc), modifier = Modifier.clickable { onStep(1) }.padding(horizontal = 18.dp, vertical = 8.dp))
     }
 }
 

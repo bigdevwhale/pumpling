@@ -94,7 +94,8 @@ fun HomeScreen(d: Data, nav: Nav) {
             "Your team lives here. Start a workout and the pets train along, eating for every set. They grow on rest days. Tap the gym to furnish it with plates."), Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
         Box(Modifier.padding(horizontal = 14.dp, vertical = 8.dp).card(22.dp).clickable { nav.push(Screen.Shop) }) {
             val sky = remember(d.s.outside, d.s.lat, System.currentTimeMillis() / 300_000) { app.pumpling.ui.art.Sky.of(d.s) }
-            GymScene(d.team, d.s.items - d.s.hidden, if (d.live != null) Pose.WORK else if (asleep) Pose.SLEEP else Pose.IDLE, sky = sky)
+            GymScene(d.team, d.s.items - d.s.hidden, if (d.live != null) Pose.WORK else if (asleep) Pose.SLEEP else Pose.IDLE, sky = sky,
+                place = d.live?.let { app.pumpling.domain.Place.of(it.place) } ?: app.pumpling.domain.Place.GYM)
             Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(38.dp).clip(CircleShape).background(Color(0x66000000)).clickable { nav.share = ShareReq(CardKind.GYM) },
                 contentAlignment = Alignment.Center) { Icon(Icons.SHARE, Color.White, 19.dp) }
         }

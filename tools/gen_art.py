@@ -83,6 +83,20 @@ Image: a background scene for a cozy fitness app: the inside of a small cozy bas
 The room: warm brick walls, a small high window near the ceiling showing a strip of sky, a wooden floor with a big soft green rubber mat in the middle, warm lamp light.
 IMPORTANT: keep the room mostly EMPTY: no gym machines, no people, no animals, no text, no posters. The centre of the floor and the walls on the left and right must be clear, free space (furniture will be added later).
 Only small details: a radiator, a few pipes along the ceiling, a light switch, a small rug edge.""",
+    "home": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
+
+Image: a background scene for a cozy fitness app: a small cozy living room at home where someone works out, seen from the front, side-on like a 2D game room.
+""" + STYLE + """ Landscape 3:2.
+The room: soft warm wallpaper, a window with light curtains, a wooden floor with a big round soft carpet in the middle, warm lamp light, the same warm cozy mood as a basement home gym.
+IMPORTANT: keep the room mostly EMPTY: no people, no animals, no text. The centre of the floor must be clear, free space (characters will stand there).
+Only small details near the edges: a sofa end on the far left, a floor lamp and a potted plant on the right, a small bookshelf, a pair of light dumbbells and a rolled yoga mat by the wall.""",
+    "street": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
+
+Image: a background scene for a cozy fitness app: an outdoor workout spot in a city park on a sunny day, seen from the front, side-on like a 2D game level.
+""" + STYLE + """ Landscape 3:2.
+The scene: blue sky with a few soft clouds at the top, green trees and bushes on the left and right edges, distant low town houses on the horizon, a sandy path and soft green grass in the front.
+IMPORTANT: keep it mostly EMPTY: no people, no animals, no text. The centre of the ground must be clear, free space (characters will stand there).
+Only small details near the edges: a simple pull-up bar on the far left, a park bench and a lamp post on the right, a water bottle by the bench.""",
     "items": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
 
 Image: a sprite sheet of 16 home-gym objects for a cozy fitness app, each a separate object, seen from the front (side-on like a 2D game room).

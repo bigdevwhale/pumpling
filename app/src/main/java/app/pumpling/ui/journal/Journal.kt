@@ -109,10 +109,14 @@ fun JournalScreen(d: Data, nav: Nav) {
 private fun History(d: Data, nav: Nav) {
     val st = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)) }
     var filter by remember { mutableStateOf(0) }
+    var where by remember { mutableStateOf("") }   // a Place code to show only, «» everywhere (#13)
     if (d.finished.isEmpty()) { Empty(tr("Здесь появятся тренировки. Начните первую кнопкой «+» внизу.", "Workouts show up here. Start one with «+» below.")); return }
     fun kindOf(w: Workout): Int { val l = d.setsBy[w.id].orEmpty().filter { it.done }; val cardio = l.count { Catalog.of(it.exId).cat == Cat.CARDIO }
         return if (cardio * 2 >= l.size) 2 else 1 }
+    val used = d.finished.map { it.place }.toSet().let { s -> app.pumpling.domain.Place.entries.filter { it.code in s } }
     val list = d.finished.sortedByDescending { it.start }.filter { w -> when (filter) { 1 -> kindOf(w) == 1; 2 -> kindOf(w) == 2; 3 -> w.prs > 0; else -> true } }
+        .filter { where.isEmpty() || it.place == where }
+    val narrowed = filter != 0 || where.isNotEmpty()
     val byWeek = list.groupBy { weekStart(dayOf(it.start)) }
     // this week and the last one open; older weeks fold into their header (any filter opens everything)
     val now = weekStart(today())
@@ -124,21 +128,25 @@ private fun History(d: Data, nav: Nav) {
         item(key = "filter") {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(tr("Все", "All"), tr("Силовые", "Strength"), tr("Кардио", "Cardio"), tr("С рекордами", "With records")).forEachIndexed { i, l -> Chip(l, filter == i) { filter = i } } }
+            // where they were, once any workout has a place
+            if (used.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(tr("Везде", "Everywhere"), where.isEmpty(), color = C.ok) { where = "" }
+                used.forEach { p -> Chip(p.label, where == p.code, color = C.ok) { where = if (where == p.code) "" else p.code } } }
         }
         if (list.isEmpty()) item { Empty(tr("Таких тренировок пока нет", "No such workouts yet")) }
         byWeek.forEach { (mon, ws) ->
             item(key = "w$mon") {
                 val work = ws.flatMap { w -> d.setsBy[w.id].orEmpty().filter { it.done && !it.warmup } }
                 val days = ws.map { dayOf(it.start) }.toSet(); val met = days.size >= d.s.weekGoal
-                val open = filter != 0 || mon in opened
+                val open = narrowed || mon in opened
                 Column(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                    .clickable(enabled = filter == 0) { opened = if (mon in opened) opened - mon else opened + mon }.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
+                    .clickable(enabled = !narrowed) { opened = if (mon in opened) opened - mon else opened + mon }.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (mon == weekStart(today())) tr("Эта неделя", "This week") else if (mon == weekStart(today()) - 7) tr("Прошлая неделя", "Last week")
                             else "${fmtDayShort(mon)} – ${fmtDayShort(mon + 6)}", style = T.h3, modifier = Modifier.weight(1f))
                         if (met) Row(Modifier.clip(RoundedCornerShape(50)).background(C.ok.copy(alpha = .14f)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.CHECK, C.ok, 13.dp); Text(" " + tr("цель", "goal"), style = T.tiny.copy(color = C.ok)) }
-                        if (filter == 0) Icon(if (open) Icons.UP else Icons.DOWN, C.mute, 20.dp, Modifier.padding(start = 6.dp))
+                        if (!narrowed) Icon(if (open) Icons.UP else Icons.DOWN, C.mute, 20.dp, Modifier.padding(start = 6.dp))
                     }
                     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         (0..6).forEach { i -> val day = mon + i; val w = ws.firstOrNull { dayOf(it.start) == day }
@@ -148,7 +156,7 @@ private fun History(d: Data, nav: Nav) {
                     }
                 }
             }
-            if (filter != 0 || mon in opened) item(key = "c$mon") {
+            if (narrowed || mon in opened) item(key = "c$mon") {
                 // a week is one card, its workouts quiet rows inside it
                 Column(Modifier.fillMaxWidth().card(18.dp)) {
                     ws.forEachIndexed { i, w ->
@@ -211,17 +219,21 @@ private fun ThisWeek(d: Data, st: Stats) {
 @Composable
 private fun PastSheet(d: Data, nav: Nav, onClose: () -> Unit) {
     val c = LocalContext.current.container
-    var back by remember { mutableStateOf(1) }
-    var hour by remember { mutableStateOf(18) }
+    var day by remember { androidx.compose.runtime.mutableLongStateOf(today() - 1) }
+    var at0 by remember { mutableStateOf(18 * 60) }
     Sheet(onClose) {
         Text(tr("Записать прошедшую тренировку", "Log a past workout"), style = T.h2)
         Text(tr("Когда была?", "When was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { (0..4).forEach { b -> Chip(when (b) { 0 -> tr("сегодня", "today"); 1 -> tr("вчера", "yesterday"); else -> fmtDayYear(today() - b) }, back == b) { back = b } } }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Chip(tr("сегодня", "today"), day == today()) { day = today() }
+            Chip(tr("вчера", "yesterday"), day == today() - 1) { day = today() - 1 }
+            app.pumpling.ui.components.DayPick(day) { day = it }
+        }
         Text(tr("Во сколько началась?", "Started at"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(7, 9, 12, 15, 18, 20).forEach { h -> Chip("$h:00", hour == h) { hour = h } } }
+        app.pumpling.ui.components.TimePick(at0) { at0 = it }
         Spacer(Modifier.height(16.dp))
         Btn(tr("Записать упражнения", "Log the exercises"), Modifier.fillMaxWidth(), enabled = d.live == null) {
-            val at = LocalDate.ofEpochDay(today() - back).atTime(hour, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val at = LocalDate.ofEpochDay(day).atTime(at0 / 60, at0 % 60).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             c.write { val id = start(null, at); dao.workout(id)?.let { dao.update(it.copy(manual = true)) } }
             onClose(); nav.push(Screen.Live)
         }
@@ -250,7 +262,7 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("${weekday(dayOf(w.start)).replaceFirstChar { it.uppercase() }}, ${fmtDayYear(dayOf(w.start))}", style = T.small.copy(color = Color(0xDDFFFFFF)))
-                    Text(tr("в ", "at ") + "%d:%02d".format(time.hour, time.minute) + (if (w.feel > 0) "  ${FEELS[w.feel - 1]}" else ""), style = T.small.copy(color = Color(0xDDFFFFFF)))
+                    Text(tr("в ", "at ") + "%d:%02d".format(time.hour, time.minute) + (app.pumpling.domain.Place.of(w.place)?.let { " · " + it.label } ?: "") + (if (w.feel > 0) "  ${FEELS[w.feel - 1]}" else ""), style = T.small.copy(color = Color(0xDDFFFFFF)))
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                         listOfNotNull(app.pumpling.domain.span(w.end - w.start) to tr("длилась", "long"),
                             if (tons > 0) tonnage(tons) to tr("поднято", "lifted") else if (meters > 0) app.pumpling.domain.km(meters) to tr("дистанция", "distance") else null,
@@ -620,7 +632,7 @@ private fun HistoryRow(w: Workout, d: Data, st: Stats, onClick: () -> Unit) {
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = T.bodyB, maxLines = 1)
             val t = work.sumOf { st.tonnageOf(it) }; val m = work.sumOf { it.meters }
-            Text(listOfNotNull(app.pumpling.domain.span(w.end - w.start), t.takeIf { it > 0 }?.let { tonnage(it) }, m.takeIf { it > 0 && t == 0.0 }?.let { app.pumpling.domain.km(it) })
+            Text(listOfNotNull(app.pumpling.domain.Place.of(w.place)?.label, app.pumpling.domain.span(w.end - w.start), t.takeIf { it > 0 }?.let { tonnage(it) }, m.takeIf { it > 0 && t == 0.0 }?.let { app.pumpling.domain.km(it) })
                 .joinToString(" · "), style = T.small, maxLines = 1)
             // what was trained, as one thin stripe
             if (cats.isNotEmpty()) Row(Modifier.padding(top = 6.dp).width(150.dp).height(4.dp).clip(RoundedCornerShape(50))) {

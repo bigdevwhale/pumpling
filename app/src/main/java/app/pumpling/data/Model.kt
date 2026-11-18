@@ -34,6 +34,8 @@ data class Workout(
     @ColumnInfo(defaultValue = "") val classOf: String = "",
     /** Muscles the user said a class worked, comma-separated Muscle ids; empty means the class's own. */
     @ColumnInfo(defaultValue = "") val muscles: String = "",
+    /** Where it was – home, the gym, a studio… – as the user named it; empty if not said (#13). */
+    @ColumnInfo(defaultValue = "") val place: String = "",
 )
 
 /**
@@ -135,6 +137,7 @@ interface Dao0 {
     @Query("SELECT * FROM Workout WHERE `end` = 0 ORDER BY start DESC LIMIT 1") suspend fun liveNow(): Workout?
     @Insert suspend fun insert(w: Workout): Long
     @Update suspend fun update(w: Workout)
+    @Query("UPDATE Workout SET place = :place WHERE id = :id") suspend fun setPlace(id: Long, place: String)
     @Query("DELETE FROM Workout WHERE id = :id") suspend fun deleteWorkout(id: Long)
 
     @Query("SELECT * FROM WSet ORDER BY workoutId, block, idx") fun sets(): Flow<List<WSet>>
@@ -187,8 +190,8 @@ interface Dao0 {
     @Query("DELETE FROM OwnEx") suspend fun clearOwnEx()
 }
 
-@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 3, exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)])
+@Database(entities = [Workout::class, WSet::class, OwnEx::class, Routine::class, Body::class, Pet::class], version = 4, exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)])
 abstract class Db : RoomDatabase() {
     abstract fun dao(): Dao0
 

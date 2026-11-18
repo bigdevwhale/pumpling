@@ -26,20 +26,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import app.pumpling.data.Pet
+import app.pumpling.domain.Place
 import app.pumpling.domain.Shop
 import kotlin.math.roundToInt
 
 /**
  * The basement gym: the generated room, the things bought for it, and the team on the mat –
- * the leader in front, companions either side.
+ * the leader in front, companions either side. At [place] home or outside the team trains there
+ * instead (#13): that scene has no bought things and no window sky, and outside darkens at night.
  */
 @Composable
-fun GymScene(team: List<Pet>, items: Set<String>, pose: Pose, modifier: Modifier = Modifier, preview: String? = null, sky: Sky? = null) {
+fun GymScene(team: List<Pet>, items: Set<String>, pose: Pose, modifier: Modifier = Modifier, preview: String? = null, sky: Sky? = null, place: Place = Place.GYM) {
     val ctx = LocalContext.current
     val tt by androidx.compose.animation.core.rememberInfiniteTransition(label = "sky").animateFloat(0f, 1f,
         androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(9000, easing = androidx.compose.animation.core.LinearEasing)), label = "t")
     val skyT = if (app.pumpling.BuildConfig.SHOTS) .3f else tt
-    val bg = Art.get(ctx, "gym_bg")
+    val gym = place == Place.GYM
+    val bg = (if (gym) null else Art.get(ctx, "${place.code}_bg")) ?: Art.get(ctx, "gym_bg")
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(1.5f)) {
         val wDp = maxWidth; val hDp = maxHeight
         Canvas(Modifier.fillMaxSize()) {
@@ -48,6 +51,10 @@ fun GymScene(team: List<Pet>, items: Set<String>, pose: Pose, modifier: Modifier
                 drawRect(Brush.verticalGradient(listOf(Color(0xFFC9876A), Color(0xFFB0705A))), size = size.copy(height = size.height * .68f))
                 drawRect(Color(0xFF8A5A3E), Offset(0f, size.height * .68f), size.copy(height = size.height * .32f))
                 drawOval(Color(0xFF5E8F5A), Offset(size.width * .22f, size.height * .78f), size.copy(width = size.width * .56f, height = size.height * .16f))
+            }
+            if (!gym) {
+                if (place == Place.STREET && sky != null && sky.day < 1f) drawRect(Color(0xFF0B1430).copy(alpha = (1f - sky.day) * .5f), size = size)
+                return@Canvas
             }
             if (sky != null) drawIntoCanvas { drawSky(it.nativeCanvas, android.graphics.RectF(0f, 0f, size.width, size.height), sky, skyT) }
             val shown = (Shop.all.filter { (it.id in items || it.id == preview) && it.id != "lights" }).sortedBy { if (it.wall) 0 else 1 }
