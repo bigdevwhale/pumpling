@@ -6,6 +6,17 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.8.0] - 2026-11-19
+
+### Added
+- **Weights planned before the gym (#18).** In a routine, «Set the weights beforehand» under an exercise opens a field for each set. A number fills the sets after it, so straight sets take one number and a pyramid a few. The next workout starts with them; after it the routine takes last time's weights again, as do sets left empty. It is all optional.
+
+<!-- tg
+Веса можно задать заранее: в программе под упражнением «+ Задать веса заранее» – своё поле на каждый подход.
+Тренировка начнётся с этих весов, а после неё программа снова берёт веса из прошлого раза.
+Можно ничего не задавать – всё работает как раньше.
+-->
+
 ## [1.7.0] - 2026-11-18
 
 ### Added

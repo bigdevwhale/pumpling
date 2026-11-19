@@ -123,6 +123,14 @@ class EngineTest {
         assertEquals(old, Plan.join(Plan.parse(old)))
         val l = Plan.parse(old).map { it.copy(sup = 1) }
         assertEquals(listOf(1, 1), Plan.parse(Plan.join(l)).map { it.sup })
+        // a weight set beforehand (#18) reads back, with or without a superset
+        val kg = listOf(Plan("squat", 3, 5, 0.0, 0, kgs = listOf(60.0, 62.5, 0.0)), Plan("bench", 3, 5, 0.0, 0, sup = 2, kgs = listOf(40.0, 40.0, 40.0)), Plan("row", 3, 8, 0.0, 0))
+        assertEquals(kg, Plan.parse(Plan.join(kg)))
+        assertEquals(listOf(0, 2, 0), Plan.parse(Plan.join(kg)).map { it.sup })
+        assertEquals("row|3|8|0.0|0", Plan.join(kg.drop(2)))   // nothing set beforehand: written as before
+        // more sets take the weight of the last one, fewer drop the rest
+        assertEquals(listOf(40.0, 45.0, 45.0, 45.0), Plan("bench", 2, 5, 0.0, 0, kgs = listOf(40.0, 45.0)).withSets(4).kgs)
+        assertEquals(listOf(40.0), Plan("bench", 2, 5, 0.0, 0, kgs = listOf(40.0, 45.0)).withSets(1).kgs)
     }
 
     @Test fun reminderFallsOnTheNextChosenDay() {

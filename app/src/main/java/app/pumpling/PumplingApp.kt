@@ -53,13 +53,24 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import kotlin.random.Random
 
-/** One planned exercise of a routine. */
-data class Plan(val exId: String, val sets: Int, val reps: Int, val weight: Double, val secs: Int, val sup: Int = 0) {
-    /** [sup] – the superset group, see [app.pumpling.domain.Supersets] – is written only when there is one, so plans without it read as before. */
-    fun code() = "$exId|$sets|$reps|$weight|$secs" + if (sup > 0) "|$sup" else ""
+/**
+ * One planned exercise of a routine. [weight] is only a fallback for a first time: a routine saved
+ * from a workout keeps that day's weight there, and last time's sets win over it. [kgs] are weights
+ * the user set beforehand for the next workout, set by set (#18): one there wins over last time, a 0
+ * or a missing one leaves that set to last time. The workout from the routine uses them up.
+ */
+data class Plan(val exId: String, val sets: Int, val reps: Int, val weight: Double, val secs: Int, val sup: Int = 0, val kgs: List<Double> = emptyList()) {
+    /** The weight set beforehand for set [i], 0 when none. */
+    fun kg(i: Int) = kgs.getOrNull(i) ?: 0.0
+    val planned get() = kgs.any { it > 0 }
+    /** [sup] – the superset group, see [app.pumpling.domain.Supersets] – and [kgs] are written only when there are, so plans without them read as before. */
+    fun code() = "$exId|$sets|$reps|$weight|$secs" + (if (sup > 0 || planned) "|$sup" else "") + if (planned) "|" + kgs.joinToString("/") else ""
+    /** [n] sets: a new set takes the weight of the one before it. */
+    fun withSets(n: Int) = copy(sets = n, kgs = if (!planned) emptyList() else List(n) { kgs.getOrNull(it) ?: kgs.last() })
     companion object {
         fun parse(items: String): List<Plan> = items.split(';').filter { it.isNotBlank() }.map { val c = it.split('|')
-            Plan(c[0], c.getOrNull(1)?.toIntOrNull() ?: 3, c.getOrNull(2)?.toIntOrNull() ?: 0, c.getOrNull(3)?.toDoubleOrNull() ?: 0.0, c.getOrNull(4)?.toIntOrNull() ?: 0, c.getOrNull(5)?.toIntOrNull() ?: 0) }
+            Plan(c[0], c.getOrNull(1)?.toIntOrNull() ?: 3, c.getOrNull(2)?.toIntOrNull() ?: 0, c.getOrNull(3)?.toDoubleOrNull() ?: 0.0, c.getOrNull(4)?.toIntOrNull() ?: 0, c.getOrNull(5)?.toIntOrNull() ?: 0,
+                c.getOrNull(6)?.split('/')?.map { k -> k.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0 }?.takeIf { l -> l.any { k -> k > 0 } } ?: emptyList()) }
         fun join(l: List<Plan>) = l.joinToString(";") { it.code() }
     }
 }
@@ -91,9 +102,9 @@ class AppContainer(context: Context) {
                     // done left and right last time: each planned set is a pair again
                     val l = prev.filter { it.side != 2 }; val r = prev.filter { it.side == 2 }
                     (0 until p.sets).flatMap { i -> listOf(1 to (l.getOrNull(i) ?: l.lastOrNull()), 2 to (r.getOrNull(i) ?: r.lastOrNull() ?: l.lastOrNull())).mapIndexed { k, (side, pv) ->
-                        WSet(workoutId = id, exId = p.exId, block = b, idx = i * 2 + k, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, side = side, superset = p.sup) } }
+                        WSet(workoutId = id, exId = p.exId, block = b, idx = i * 2 + k, weight = if (p.kg(i) > 0) p.kg(i) else pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, side = side, superset = p.sup) } }
                 } else (0 until p.sets).map { i -> val pv = prev.getOrNull(i) ?: prev.lastOrNull()
-                    WSet(workoutId = id, exId = p.exId, block = b, idx = i, weight = pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, superset = p.sup) }
+                    WSet(workoutId = id, exId = p.exId, block = b, idx = i, weight = if (p.kg(i) > 0) p.kg(i) else pv?.weight ?: p.weight, reps = pv?.reps ?: p.reps, secs = pv?.secs ?: p.secs, meters = pv?.meters ?: 0.0, superset = p.sup) }
             }
             dao.insertSets(sets)
         }
@@ -215,6 +226,11 @@ class AppContainer(context: Context) {
             val plates = out0.plates + newQuests.sumOf { it.plates } + ach.sumOf { Achievements.plates(it.second) }
             val saved = finished.copy(plates = plates)
             dao.update(saved)
+            // weights set beforehand were for this workout: from now on last time's – this one's – fill the routine again (#18).
+            // An exercise skipped today keeps them for the next time.
+            if (w.routineId != 0L) dao.routineList().firstOrNull { it.id == w.routineId }?.let { r ->
+                val did = marked.map { it.exId }.toSet(); val ps = Plan.parse(r.items)
+                if (ps.any { it.planned && it.exId in did }) dao.update(r.copy(items = Plan.join(ps.map { if (it.exId in did) it.copy(kgs = emptyList()) else it }))) }
             Finished(saved, marked, out0.copy(plates = plates, eggs = eggs, quests = newQuests, achievements = ach), week, questIds, doneBefore)
         } ?: return null
         val out = f.out

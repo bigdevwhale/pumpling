@@ -473,6 +473,7 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
     var name by remember { mutableStateOf(old?.name ?: "") }
     var askDelete by remember { mutableStateOf(false) }
     val plans = remember { mutableStateListOf<Plan>().apply { addAll(old?.let { Plan.parse(it.items) } ?: emptyList()) } }
+    val open = remember { mutableStateListOf<String>() }   // exercises whose weights are unfolded
     if (nav.picked.isNotEmpty()) { nav.picked.forEach { ex -> val k = Catalog.of(ex).kind
         plans.add(Plan(ex, if (k == Kind.CARDIO || k == Kind.MINUTES) 1 else 3, if (k.timed) 0 else 10, 0.0, when (k) { Kind.HOLD -> 45; Kind.CARDIO -> 1800; Kind.MINUTES -> 900; else -> 0 })) }; nav.picked = emptyList() }
     val col = planMain(plans)?.let { Color(it.color) } ?: C.acc
@@ -507,8 +508,8 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
             }
         }
         Section(icon = Icons.GYM, text = tr("Упражнения", "Exercises"))
-        app.pumpling.ui.components.Hint("routine-edit", d.s.seen, Icons.LIST, tr("Как собрать программу", "Building a routine"), tr("Добавьте упражнения и задайте подходы и повторы. Стрелкой меняется порядок. Когда начнёте программу, всё подставится само, а веса возьмутся из прошлого раза.",
-            "Add exercises and set sets and reps; the arrow changes the order. When you start it, everything fills in, weights from last time."), Modifier.padding(bottom = 10.dp))
+        app.pumpling.ui.components.Hint("routine-edit", d.s.seen, Icons.LIST, tr("Как собрать программу", "Building a routine"), tr("Добавьте упражнения и задайте подходы и повторы. Стрелкой меняется порядок. Веса на следующую тренировку можно вписать заранее, по подходам; пустые возьмутся из прошлого раза. Когда начнёте программу, всё подставится само.",
+            "Add exercises and set sets and reps; the arrow changes the order. Weights for the next workout can be set beforehand, set by set; empty ones come from last time. When you start it, everything fills in."), Modifier.padding(bottom = 10.dp))
         if (plans.isEmpty()) Column(Modifier.fillMaxWidth().card(20.dp).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             d.leader?.let { app.pumpling.ui.art.PetView(it, 110.dp, app.pumpling.ui.art.Pose.IDLE) }
             Text(tr("Пока пусто. Добавьте упражнения – подходы и повторы поправите здесь же.", "Empty for now. Add exercises – sets and reps are set right here."), style = T.body, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
@@ -528,11 +529,46 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
                     if (last != null) Text(tr("В прошлый раз: ", "Last time: ") + last.take(4).joinToString(", ") { app.pumpling.domain.setLine(ex, it).removePrefix("× ") } + (if (last.size > 4) " …" else ""),
                         style = T.tiny.copy(color = C.ink), maxLines = 1, modifier = Modifier.padding(top = 4.dp))
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Stepper(tr("подходы", "sets"), "${p.sets}") { plans[i] = p.copy(sets = (p.sets + it).coerceIn(1, 12)) }
+                        Stepper(tr("подходы", "sets"), "${p.sets}") { plans[i] = p.withSets((p.sets + it).coerceIn(1, 12)) }
                         when (ex.kind) {
                             Kind.HOLD -> Stepper(tr("секунды", "seconds"), "${p.secs}") { plans[i] = p.copy(secs = (p.secs + it * 15).coerceIn(15, 600)) }
                             Kind.CARDIO, Kind.MINUTES -> Stepper(tr("минуты", "minutes"), "${p.secs / 60}") { plans[i] = p.copy(secs = (p.secs + it * 300).coerceIn(300, 7200)) }
                             else -> Stepper(tr("повторы", "reps"), "${p.reps}") { plans[i] = p.copy(reps = (p.reps + it).coerceIn(1, 50)) }
+                        }
+                    }
+                    // weights set by set for the next workout (#18), folded away until asked for; an empty one – last time's
+                    if (ex.kind == Kind.WEIGHT || ex.kind == Kind.ASSIST) {
+                        fun kgOf(s: String) = app.pumpling.domain.toKg(s.replace(',', '.').toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0)
+                        val lastW = last?.filter { it.side != 2 }.orEmpty()
+                        val isOpen = p.exId in open
+                        val unit = app.pumpling.domain.unit()
+                        if (!isOpen) Text(if (p.planned) tr("✓ Веса: ", "✓ Weights: ") + (0 until p.sets).joinToString(" · ") { j -> if (p.kg(j) > 0) app.pumpling.domain.w(p.kg(j)) else "–" } + " " + unit
+                            else tr("+ Задать веса заранее", "+ Set the weights beforehand"),
+                            style = T.smallB.copy(color = if (p.planned) C.acc else C.mute), modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(10.dp)).clickable { open += p.exId }.padding(vertical = 4.dp, horizontal = 2.dp))
+                        else Column(Modifier.padding(top = 10.dp).fillMaxWidth()) {
+                            Text(tr("Веса на следующую тренировку", "Weights for the next workout"), style = T.smallB)
+                            Text(tr("Пустой подход возьмёт вес из прошлого раза. После тренировки поля очистятся.", "An empty set takes last time's weight. The fields clear after the workout."),
+                                style = T.tiny, modifier = Modifier.padding(bottom = 4.dp))
+                            for (j in 0 until p.sets) androidx.compose.runtime.key(j) {
+                                var txt by remember { mutableStateOf("") }
+                                // the row may now hold another plan (moved, removed, filled down): the text follows the plan, not the other way
+                                if (kotlin.math.abs(kgOf(txt) - p.kg(j)) > 1e-6) txt = if (p.kg(j) > 0) app.pumpling.domain.w(p.kg(j)) else ""
+                                val was = ((lastW.getOrNull(j) ?: lastW.lastOrNull())?.weight ?: 0.0).takeIf { it > 0 }
+                                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(tr("Подход ${j + 1}", "Set ${j + 1}"), style = T.small.copy(color = C.ink), modifier = Modifier.width(76.dp))
+                                    Field(txt, { s -> if ((s.replace(',', '.').toDoubleOrNull() ?: 0.0) > 1000) return@Field; txt = s; val cur = plans[i]; val old = cur.kg(j); val v = kgOf(s)
+                                        // a weight fills the sets after it that are empty or had the same: one number is enough for straight sets
+                                        val l = List(cur.sets) { k -> when { k < j -> cur.kg(k); k == j -> v; cur.kg(k) == 0.0 || cur.kg(k) == old -> v; else -> cur.kg(k) } }
+                                        plans[i] = cur.copy(kgs = if (l.any { it > 0 }) l else emptyList())
+                                    }, was?.let { app.pumpling.domain.w(it) } ?: "–", Modifier.width(84.dp), number = true, style = T.numS, center = true)
+                                    Text(" " + unit, style = T.small)
+                                    if (was != null) Text(tr("было ", "was ") + app.pumpling.domain.w(was), style = T.tiny, maxLines = 1, modifier = Modifier.weight(1f).padding(start = 10.dp))
+                                }
+                            }
+                            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                if (p.planned) Text(tr("Очистить", "Clear"), style = T.smallB.copy(color = C.mute), modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { plans[i] = plans[i].copy(kgs = emptyList()) }.padding(vertical = 4.dp, horizontal = 2.dp))
+                                Text(tr("Свернуть", "Fold"), style = T.smallB.copy(color = C.acc), modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { open -= p.exId }.padding(vertical = 4.dp, horizontal = 2.dp))
+                            }
                         }
                     }
                     // a superset: this exercise and the next go back to back, the rest comes after the last
@@ -547,7 +583,8 @@ fun RoutinePage(id: Long, d: Data, nav: Nav) {
             Icon(Icons.PLUS, C.acc, 20.dp); Text("  " + tr("Добавить упражнения", "Add exercises"), style = T.btn.copy(color = C.acc)) }
         Spacer(Modifier.height(18.dp))
         if (old != null) { Btn(tr("Начать тренировку", "Start workout"), Modifier.fillMaxWidth(), color = C.ok) {
-            if (d.live == null) nav.askStart = old.id else { c.say(tr("Сначала закончите текущую тренировку", "Finish the current workout first")); nav.push(Screen.Live) } }
+            // what is on the screen – weights just typed in too – is what the workout starts from
+            if (d.live == null) { if (plans.isNotEmpty()) c.write { dao.update(old.copy(name = name.trim().ifEmpty { old.name }, items = Plan.join(plans))) }; nav.askStart = old.id } else { c.say(tr("Сначала закончите текущую тренировку", "Finish the current workout first")); nav.push(Screen.Live) } }
             Spacer(Modifier.height(10.dp)) }
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), enabled = name.isNotBlank() && plans.isNotEmpty()) {
             c.write { if (old == null) dao.insert(Routine(name = name.trim(), items = Plan.join(plans), created = System.currentTimeMillis(), order = d.routines.size))

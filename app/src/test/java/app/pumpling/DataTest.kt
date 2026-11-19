@@ -30,6 +30,37 @@ class DataTest {
     @Before fun up() { Lang.ru = true; Catalog.load(File("src/main/assets/exercises.tsv").readLines()); c = AppContainer(RuntimeEnvironment.getApplication()) }
     @After fun down() { c.db.close() }
 
+    @Test fun aWeightSetBeforehandWinsOverLastTime() = runBlocking {
+        // last time: squats at 60 (written straight in: finish() would pay plates into settings other tests share)
+        val first = c.dao.insert(app.pumpling.data.Workout(start = 1_000, end = 2_000_000))
+        c.dao.insertSets((0..1).map { app.pumpling.data.WSet(workoutId = first, exId = "squat", block = 0, idx = it, weight = 60.0, reps = 5, done = true, doneAt = 1_000_000) })
+        // the plan: squats 65, 70 and one left empty set beforehand, bench left empty, and a saved day's weight that last time beats
+        val r = app.pumpling.data.Routine(id = 1, name = "R", items = Plan.join(listOf(Plan("squat", 3, 5, 50.0, 0, kgs = listOf(65.0, 70.0, 0.0)), Plan("bench", 2, 8, 40.0, 0))))
+        val id = c.start(r)
+        val sets = c.dao.setsOfNow(id)
+        assertEquals(listOf(65.0, 70.0, 60.0), sets.filter { it.exId == "squat" }.map { it.weight })   // the empty one: last time's
+        assertEquals(listOf(40.0, 40.0), sets.filter { it.exId == "bench" }.map { it.weight })   // never done: the plan's fallback
+        c.dao.deleteSetsOf(id); c.dao.deleteWorkout(id)
+        // without a weight set beforehand, last time wins over the saved one, as before
+        val id2 = c.start(r.copy(items = Plan.join(listOf(Plan("squat", 2, 5, 50.0, 0)))))
+        assertEquals(listOf(60.0, 60.0), c.dao.setsOfNow(id2).map { it.weight })
+    }
+
+    @Test fun weightsSetBeforehandAreUsedUpByTheWorkout() = runBlocking {
+        val rid = c.dao.insert(app.pumpling.data.Routine(name = "R", items = Plan.join(listOf(Plan("squat", 2, 5, 0.0, 0, kgs = listOf(70.0, 75.0)), Plan("bench", 2, 5, 0.0, 0, kgs = listOf(50.0, 50.0))))))
+        val id = c.start(c.dao.routineList().single { it.id == rid })
+        // squats done, bench skipped today
+        c.dao.updateSets(c.dao.setsOfNow(id).filter { it.exId == "squat" }.map { it.copy(done = true, doneAt = System.currentTimeMillis()) })
+        val plates = c.settings.now().plates
+        c.finish(id, "", "", 0)
+        c.settings.update { it.copy(plates = plates, achieved = emptySet()) }   // settings are shared between tests
+        val after = Plan.parse(c.dao.routineList().single { it.id == rid }.items)
+        assertEquals(emptyList<Double>(), after.single { it.exId == "squat" }.kgs)            // last time's from now on: 70, 75
+        assertEquals(listOf(50.0, 50.0), after.single { it.exId == "bench" }.kgs)             // not done: still waiting
+        val next = c.start(c.dao.routineList().single { it.id == rid })
+        assertEquals(listOf(70.0, 75.0), c.dao.setsOfNow(next).filter { it.exId == "squat" }.map { it.weight })
+    }
+
     @Test fun workoutFinishesOnceAndABackupBringsItBack() = runBlocking {
         c.dao.insert(Pet(species = "bull", name = "B", nature = "steady", found = 0, hatched = 1, slot = 0))
         val id = c.start()

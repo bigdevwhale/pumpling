@@ -321,9 +321,11 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
                     Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         app.pumpling.ui.art.ExThumb(ex, 40.dp)
                         Text(ex.name, style = T.body, modifier = Modifier.weight(1f).padding(start = 10.dp), maxLines = 1)
-                        Text(when (ex.kind) { Kind.CARDIO, Kind.MINUTES -> tr("${p.secs / 60} мин", "${p.secs / 60} min"); Kind.HOLD -> "${p.sets}\u00a0×\u00a0${p.secs}" + tr("\u00a0с", "\u00a0s"); else -> "${p.sets}\u00a0×\u00a0${p.reps}" }, style = T.smallB)
+                        Text(when (ex.kind) { Kind.CARDIO, Kind.MINUTES -> tr("${p.secs / 60} мин", "${p.secs / 60} min"); Kind.HOLD -> "${p.sets}\u00a0×\u00a0${p.secs}" + tr("\u00a0с", "\u00a0s"); else -> "${p.sets}\u00a0×\u00a0${p.reps}" } + (p.kgs.filter { it > 0 }.takeIf { it.isNotEmpty() }?.let { k -> " · " + app.pumpling.domain.w(k.min()) + (if (k.max() > k.min()) "–" + app.pumpling.domain.w(k.max()) else "") + " " + app.pumpling.domain.unit() } ?: ""), style = T.smallB)
                     } }
-                Text(tr("Веса подставятся из прошлого раза", "Weights come from last time"), style = T.tiny, modifier = Modifier.padding(top = 10.dp))
+                // weights set beforehand (#18) go in as they are; the rest come from last time
+                Text(if (plans.none { it.planned }) tr("Веса подставятся из прошлого раза", "Weights come from last time")
+                    else tr("Заданные веса – как в программе, остальные – из прошлого раза", "Weights you set go in as they are, the rest come from last time"), style = T.tiny, modifier = Modifier.padding(top = 10.dp))
             }
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
