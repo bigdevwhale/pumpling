@@ -3,7 +3,7 @@
 <h1 align="center">Pumpling</h1>
 
 <p align="center">A workout log with pets that train alongside you.<br>
-<a href="https://bigdevwhale.github.io/stillcraft/apps/pumpling/">Website</a> · <a href="https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk">Download APK</a> · <a href="README.ru.md">Русский</a></p>
+<a href="https://bigdevwhale.github.io/stillcraft/apps/pumpling/">Website</a> · <a href="https://play.google.com/store/apps/details?id=app.pumpling">Google Play</a> · <a href="https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk">Download APK</a> · <a href="README.ru.md">Русский</a></p>
 
 Log your sets, weights and cardio, and your team in a small basement gym does the same: the leader presses a tiny barbell, the two beside it cheer. Every set feeds them, and they grow on rest days – like real muscles. The longer you train, the more pets you find: eggs turn up from the way you train.
 
@@ -26,7 +26,7 @@ Log your sets, weights and cardio, and your team in a small basement gym does th
 
 ## Install
 
-Download [Pumpling.apk](https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk) on a phone with Android 9 or later, open it and allow installs from that source when Android asks.
+Get it on **[Google Play](https://play.google.com/store/apps/details?id=app.pumpling)**, or download [Pumpling.apk](https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk) on a phone with Android 9 or later, open it and allow installs from that source when Android asks.
 
 ## Privacy
 

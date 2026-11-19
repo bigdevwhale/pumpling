@@ -62,6 +62,7 @@ jobs:
         run: |
           awk -v v="${{ steps.v.outputs.name }}" 'index($0, "## [" v "]") == 1 {f=1; next} index($0, "## [") == 1 {f=0} f' CHANGELOG.md > dist/notes.md
           [ -s dist/notes.md ] || echo "Pumpling ${{ steps.v.outputs.name }}" > dist/notes.md
+          printf '\n**[Get it on Google Play](https://play.google.com/store/apps/details?id=app.pumpling)** · or download `Pumpling.apk` below\n' >> dist/notes.md
           cat dist/notes.md
 
       - name: Publish GitHub release

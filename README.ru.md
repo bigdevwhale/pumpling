@@ -3,7 +3,7 @@
 <h1 align="center">Pumpling</h1>
 
 <p align="center">Дневник тренировок с питомцами, которые тренируются вместе с вами.<br>
-<a href="https://bigdevwhale.github.io/stillcraft/apps/pumpling/">Сайт</a> · <a href="https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk">Скачать APK</a> · <a href="README.md">English</a></p>
+<a href="https://bigdevwhale.github.io/stillcraft/apps/pumpling/">Сайт</a> · <a href="https://play.google.com/store/apps/details?id=app.pumpling">Google Play</a> · <a href="https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk">Скачать APK</a> · <a href="README.md">English</a></p>
 
 Записывайте подходы, веса и кардио, а ваша команда в маленьком подвальном зале делает то же самое: ведущий жмёт штангу, двое рядом болеют. За каждый подход питомцы получают еду, а растут в дни отдыха – как настоящие мышцы. Чем дольше вы занимаетесь, тем больше находите питомцев: яйца появляются в зависимости от того, как именно вы тренируетесь.
 
@@ -26,7 +26,7 @@
 
 ## Установка
 
-Скачайте [Pumpling.apk](https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk) на телефон с Android 9 или новее, откройте файл и разрешите установку из этого источника, когда Android спросит.
+Поставьте из **[Google Play](https://play.google.com/store/apps/details?id=app.pumpling)** или скачайте [Pumpling.apk](https://github.com/bigdevwhale/pumpling/releases/latest/download/Pumpling.apk) на телефон с Android 9 или новее, откройте файл и разрешите установку из этого источника, когда Android спросит.
 
 ## Приватность
 
