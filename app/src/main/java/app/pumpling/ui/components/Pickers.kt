@@ -99,10 +99,10 @@ fun DayPick(day: Long, modifier: Modifier = Modifier, onPick: (Long) -> Unit) {
 /** How long it took: quick choices and a field for any other number of minutes (#12). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MinutesPick(mins: Int, onChange: (Int) -> Unit) {
+fun MinutesPick(mins: Int, choices: List<Int> = listOf(15, 30, 45, 60, 90), onChange: (Int) -> Unit) {
     var text by remember { mutableStateOf("$mins") }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-        listOf(15, 30, 45, 60, 90).forEach { m -> Chip("$m", mins == m) { text = "$m"; onChange(m) } }
+        choices.forEach { m -> Chip("$m", mins == m) { text = "$m"; onChange(m) } }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Field(text, { t -> text = t.filter { it.isDigit() }.take(3); text.toIntOrNull()?.takeIf { it in 1..720 }?.let(onChange) },
                 tr("своё", "other"), Modifier.width(76.dp), number = true, center = true)

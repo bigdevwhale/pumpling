@@ -289,17 +289,35 @@ fun GearPopup(d: Data, onClose: () -> Unit, onAdded: (String) -> Unit = {}) {
 fun StartSheet(first: Long, d: Data, nav: Nav) {
     val c = LocalContext.current.container
     var pick by remember { mutableStateOf(first) }
-    // -1: a group class (#10)
+    // -1: a group class (#10); -2: already done, logged in one go (#22)
     var kind by remember { mutableStateOf(CLASSES.first()) }
     var name by remember { mutableStateOf("") }
+    var doneEx by remember { mutableStateOf(QUICK.first()) }
+    var doneMins by remember { mutableStateOf(10) }
+    var donePlace by remember { mutableStateOf(d.finished.maxByOrNull { it.start }?.place.orEmpty()) }
     val r = d.routines.firstOrNull { it.id == pick }
     val plans = r?.let { Plan.parse(it.items) }.orEmpty()
     app.pumpling.ui.components.Sheet({ nav.askStart = null }) {
         Text(tr("Начать тренировку?", "Start a workout?"), style = T.h2)
         Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Chip(tr("Без программы", "No routine"), pick == 0L, color = C.ok) { pick = 0L }
+            Chip(tr("Уже сделано", "Already done"), pick == -2L, color = C.ok) { pick = -2L }
             Chip(tr("Групповое занятие", "Group class"), pick == -1L, color = C.ok) { pick = -1L }
             d.routines.forEach { x -> Chip(x.name, pick == x.id) { pick = x.id } }
+        }
+        if (pick == -2L) {
+            Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+                Text(tr("Позанимались – отметьте одним разом, без отдельных упражнений и таймера.",
+                    "Done already? Log it in one go – no separate exercises, no timer."), style = T.body)
+                Text(tr("Что было", "What it was"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    QUICK.forEach { id -> Chip(Catalog.of(id).name, doneEx == id) { doneEx = id } }
+                }
+                Text(tr("Сколько минут", "How many minutes"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                app.pumpling.ui.components.MinutesPick(doneMins, listOf(5, 10, 15, 20, 30)) { doneMins = it }
+                Text(tr("Где", "Where"), style = T.bodyB, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
+                app.pumpling.ui.components.PlacePick(donePlace) { donePlace = it }
+            }
         }
         if (pick == -1L) {
             Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
@@ -311,7 +329,7 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
                 app.pumpling.ui.components.Field(name, { name = it.take(40) }, tr("Название, если хочется: «Пилатес у Маши»", "A name if you like: «Pilates with Anna»"), Modifier.fillMaxWidth().padding(top = 10.dp))
             }
         }
-        if (pick != -1L) Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+        if (pick >= 0L) Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
             if (r == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) { app.pumpling.ui.components.Badge(Icons.PLUS, C.ok)
                     Text(tr("Упражнения добавите по ходу – кнопкой «+ Упражнение».", "You add exercises as you go – with «+ Exercise»."), style = T.body, modifier = Modifier.padding(start = 12.dp)) }
@@ -330,7 +348,12 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Ghost(tr("Отмена", "Cancel"), Modifier.weight(1f)) { nav.askStart = null }
-            Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) {
+            if (pick == -2L) Btn(tr("Отметить", "Log it"), Modifier.weight(1.4f), color = C.ok) {
+                nav.askStart = null
+                val ex = doneEx; val m = doneMins; val p = donePlace
+                c.write { val r = logDone(ex, m, p)
+                    if (r != null) nav.push(Screen.Result(r.first, r.second)) else say(tr("Сначала закончите текущую тренировку", "Finish the current workout first")) }
+            } else Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) {
                 nav.askStart = null
                 if (pick == -1L) { val k = kind; val n = name.ifBlank { Catalog.of(k).name }; c.write { startClass(k, n) } } else c.write { start(r) }
                 nav.push(Screen.Live)
@@ -338,6 +361,9 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
         }
     }
 }
+
+/** What can be logged as already done, just minutes (#22). */
+val QUICK = listOf("stretch", "yoga", "mobility", "foam_roll", "pilates")
 
 /** Kinds of group class to start, in this order; «group_class» is anything else. */
 val CLASSES = listOf("pilates", "stretching_class", "yoga", "circuit", "hiit", "tabata", "dance", "aqua_aerobics", "kickboxing", "martial", "group_class")

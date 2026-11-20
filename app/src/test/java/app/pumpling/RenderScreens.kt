@@ -82,6 +82,9 @@ class RenderScreens {
         // rain in the window
         runBlocking { c.settings.update { it.copy(outside = app.pumpling.data.Outside(app.pumpling.data.Weather.RAIN, 90, 6.0, 0, 0, System.currentTimeMillis()).json()) } }
         Start.tab = 0; rule.runOnUiThread { i = 160 }; shot("1b-home-rain")
+        // «Start a workout?» on «Already done» (#22)
+        Start.tab = 0; Start.open = "start"; rule.runOnUiThread { i = 170 }
+        repeat(6) { rule.mainClock.advanceTimeBy(400); Thread.sleep(150); org.robolectric.shadows.ShadowLooper.idleMainLooper() }; rule.onAllNodesWithText("Уже сделано")[0].performClick(); shot("19-start-done")
         // the live workout
         runBlocking { val w = c.start(null); listOf("squat", "bench", "plank", "run").forEach { c.addExercise(w, it) }
             c.dao.setsOfNow(w).take(2).forEach { s -> c.dao.update(s.copy(done = true, doneAt = System.currentTimeMillis())) }

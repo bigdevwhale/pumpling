@@ -119,6 +119,18 @@ class AppContainer(context: Context) {
         return id
     }
 
+    /**
+     * Something already done, logged in one go (#22): [mins] of [exId] that ended just now, as a finished workout
+     * with one timed set – no live screen, no ticking. Returns the workout and what it brought, or null.
+     */
+    suspend fun logDone(exId: String, mins: Int, place: String, end: Long = System.currentTimeMillis()): Pair<Long, Outcome>? {
+        if (dao.liveNow() != null) return null
+        val secs = mins.coerceIn(1, 720) * 60
+        val id = dao.insert(Workout(start = end - secs * 1000L, manual = true, place = place))
+        dao.insertSets(listOf(WSet(workoutId = id, exId = exId, block = 0, idx = 0, secs = secs, done = true, doneAt = end)))
+        return finish(id, Catalog.of(exId).name, "", 0, end, place)?.let { id to it }
+    }
+
     /** Where a new workout probably is (#13): where this routine or class was last time, else where the last workout was. */
     private suspend fun placeFor(routineId: Long, classOf: String): String {
         val done = dao.workoutList().filter { it.end > 0 && Place.of(it.place) != null }   // newest first

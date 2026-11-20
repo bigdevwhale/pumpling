@@ -147,7 +147,7 @@ fun Root(s: Settings) {
     LaunchedEffect(Unit) {
         when (Start.open) { "live" -> nav.push(Screen.Live); "shop" -> nav.push(Screen.Shop); "wrapped" -> nav.push(Screen.Wrapped(java.time.LocalDate.now().year))
             "body" -> nav.push(Screen.BodyLog); "achievements" -> nav.push(Screen.Achievements); "settings" -> nav.push(Screen.Settings)
-            "picker" -> nav.push(Screen.Picker()); "routine" -> nav.push(Screen.RoutineEdit(0))
+            "picker" -> nav.push(Screen.Picker()); "routine" -> nav.push(Screen.RoutineEdit(0)); "start" -> nav.askStart = 0L
             else -> Start.open?.let { o -> if (o.startsWith("part:")) nav.push(Screen.StatsPart(o.drop(5).toInt())) else if (o.startsWith("pet:")) nav.push(Screen.PetInfo(o.drop(4).toLong())) else if (o.startsWith("workout:")) nav.push(Screen.WorkoutView(o.drop(8).toLong())) else if (o.startsWith("edit:")) nav.push(Screen.Edit(o.drop(5).toLong())) else if (o.startsWith("ex:")) nav.push(Screen.Exercise(o.drop(3))) else if (o.startsWith("share:")) nav.share = ShareReq(CardKind.valueOf(o.drop(6).substringBefore(':')), o.drop(6).substringAfter(':', "0").toLong()) } }
         Start.open = null
     }

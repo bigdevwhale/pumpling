@@ -46,6 +46,23 @@ class DataTest {
         assertEquals(listOf(60.0, 60.0), c.dao.setsOfNow(id2).map { it.weight })
     }
 
+    @Test fun stretchingIsLoggedInOneGo() = runBlocking {
+        val s0 = c.settings.now()
+        val end = 50_000_000L
+        val (id, out) = c.logDone("stretch", 10, "home", end)!!
+        c.settings.update { it.copy(plates = s0.plates, achieved = s0.achieved) }   // settings are shared between tests
+        val w = c.dao.workout(id)!!
+        assertEquals(end, w.end); assertEquals(end - 600_000, w.start)
+        assertEquals("Растяжка", w.title); assertEquals("home", w.place); assertTrue(w.manual)
+        val sets = c.dao.setsOfNow(id)
+        assertEquals(1, sets.size); assertEquals(600, sets.single().secs); assertTrue(sets.single().done)
+        assertTrue(out.food > 0)   // the pets ate
+        // a workout going on: nothing is logged over it
+        val live = c.start()
+        assertNull(c.logDone("yoga", 15, "", end + 1_000_000))
+        c.dao.deleteWorkout(live)
+    }
+
     @Test fun weightsSetBeforehandAreUsedUpByTheWorkout() = runBlocking {
         val rid = c.dao.insert(app.pumpling.data.Routine(name = "R", items = Plan.join(listOf(Plan("squat", 2, 5, 0.0, 0, kgs = listOf(70.0, 75.0)), Plan("bench", 2, 5, 0.0, 0, kgs = listOf(50.0, 50.0))))))
         val id = c.start(c.dao.routineList().single { it.id == rid })
