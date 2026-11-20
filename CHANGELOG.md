@@ -6,6 +6,17 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.9.0] - 2026-11-20
+
+### Added
+- **Pets of the places (#21):** a cat that likes workouts at home (×1.5, its egg after 15 home workouts), a fox for workouts outside (×1.5, after 15 outside) and a penguin for group classes (×1.7, after 10 classes).
+- **A group class as a place:** aerobics, a dance class or functional training with a coach. The team trains in a bright studio with a long mirror.
+
+<!-- tg
+Новые питомцы мест: кошка любит тренировки дома, лис – на улице, а пингвин – групповые занятия
+Появилось новое место тренировки – «Группа», со своей светлой студией
+-->
+
 ## [1.8.0] - 2026-11-19
 
 ### Added
