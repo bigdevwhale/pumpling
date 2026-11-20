@@ -6,6 +6,16 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.10.0] - 2026-11-20
+
+### Added
+- **Already done (#22):** stretching, yoga, mobility, foam rolling or pilates logged in one go – pick what it was and how many minutes, no separate exercises and no timer. The pets eat and the minutes count towards the stretching quest, as with any workout.
+
+<!-- tg
+Растяжку теперь можно отметить одним разом: «Начать тренировку» → «Уже сделано», выбрать, что было, и сколько минут
+Так же отмечаются йога, мобилити, ролл-массаж и пилатес – без отдельных упражнений и таймера
+-->
+
 ## [1.9.0] - 2026-11-20
 
 ### Added
