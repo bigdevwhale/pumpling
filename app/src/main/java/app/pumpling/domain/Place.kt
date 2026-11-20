@@ -7,7 +7,9 @@ package app.pumpling.domain
 enum class Place(val code: String, private val ru: String, private val en: String) {
     HOME("home", "Дом", "Home"),
     GYM("gym", "Зал", "Gym"),
-    STREET("street", "Улица", "Outside");
+    STREET("street", "Улица", "Outside"),
+    /** A group class: aerobics, a dance class, functional training with a coach (#21). */
+    GROUP("group", "Группа", "Class");
 
     val label get() = tr(ru, en)
 

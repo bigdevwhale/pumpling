@@ -15,7 +15,10 @@ SHEETS = ROOT / "art" / "sheets"
 OUT = ROOT / "app" / "src" / "main" / "res" / "drawable-nodpi"
 
 PETS = ["bull", "otter", "lynx", "octopus", "crab", "hedgehog", "kangaroo", "hummingbird", "turtle", "sloth",
-        "squirrel", "gorilla", "ant", "crane", "mole", "owl", "hamster", "phoenix", "mammoth", "dragon"]
+        "squirrel", "gorilla", "ant", "crane", "mole", "owl", "hamster", "phoenix", "mammoth", "dragon",
+        "cat", "fox", "penguin"]
+# the first 20 eggs are in eggs.png, the pets of the places (#21) in eggs_place.png
+PLACE_PETS = ["cat", "fox", "penguin"]
 ITEMS = ["rack", "treadmill", "rower", "bag", "plant", "poster", "boombox", "lights",
          "trophies", "mirror", "kettle", "mat", "cooler", "fan", "neon", "bench"]
 MAX = 320
@@ -82,7 +85,11 @@ def main():
         g = g.resize((960, round(960 * g.height / g.width)), Image.LANCZOS)
         g.save(OUT / "gym_bg.webp", "WEBP", quality=88, method=6)
         print("gym")
-    for place in ("home", "street"):   # the other places a workout can be (#13)
+    if (SHEETS / "eggs_place.png").exists():
+        for name, fr in zip(PLACE_PETS, frames(SHEETS / "eggs_place.png", 3, 1)):
+            save(fr, f"egg_{name}")
+        print("eggs_place")
+    for place in ("home", "street", "group"):   # the other places a workout can be (#13, #21)
         if (SHEETS / f"{place}.png").exists():
             g = Image.open(SHEETS / f"{place}.png").convert("RGB")
             g = g.resize((960, round(960 * g.height / g.width)), Image.LANCZOS)

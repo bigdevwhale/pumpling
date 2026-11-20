@@ -26,6 +26,10 @@ class Tally(val workouts: List<Workout>, val sets: List<WSet>, val s: Settings) 
     val liftedBw = work.any { Catalog.of(it.exId).kind == Kind.WEIGHT && it.weight >= bw && it.reps >= 1 }
     val early = workouts.count { val t = java.time.Instant.ofEpochMilli(it.start).atZone(zone).toLocalTime(); t.hour < 7 || (t.hour == 7 && t.minute < 30) }
     val late = workouts.count { hourOf(it.start) >= 21 }
+    /** Workouts by place (#21). */
+    val atHome = workouts.count { it.place == Place.HOME.code }
+    val outside = workouts.count { it.place == Place.STREET.code }
+    val classes = workouts.count { it.place == Place.GROUP.code }
     val tonnage = work.sumOf { tonnageOf(it) }
     val cats = work.map { Catalog.of(it.exId).cat }.toSet()
     val days = workouts.map { dayOf(it.start) }.toSortedSet()
@@ -94,6 +98,10 @@ object Engine {
         if ("squirrel" in species && distinct >= 5) { teamExtra += .3; bonus += tr("Белка: ${distinct} упражнений, ×1,3", "Squirrel: $distinct exercises, ×1.3") }
         if ("mole" in species && hour < 8) { teamExtra += .5; bonus += tr("Крот: утренняя тренировка, ×1,5", "Mole: a morning workout, ×1.5") }
         if ("owl" in species && hour >= 20) { teamExtra += .5; bonus += tr("Сова: вечерняя тренировка, ×1,5", "Owl: an evening workout, ×1.5") }
+        // the pets of the places (#21)
+        if ("cat" in species && w.place == Place.HOME.code) { teamExtra += .5; bonus += tr("Кошка: тренировка дома, ×1,5", "Cat: a workout at home, ×1.5") }
+        if ("fox" in species && w.place == Place.STREET.code) { teamExtra += .5; bonus += tr("Лис: тренировка на улице, ×1,5", "Fox: a workout outside, ×1.5") }
+        if ("penguin" in species && w.place == Place.GROUP.code) { teamExtra += .7; bonus += tr("Пингвин: групповое занятие, ×1,7", "Penguin: a group class, ×1.7") }
         if ("hamster" in species && weeks.streak > 0) { val b = min(.5, .1 * weeks.streak); teamExtra += b; bonus += tr("Хомяк: ${weeks.streak} нед. подряд, +${(b * 100).toInt()}%", "Hamster: ${weeks.streak} weeks in a row, +${(b * 100).toInt()}%") }
         if ("phoenix" in species && gap >= 10) { teamExtra += 2.0; bonus += tr("Феникс: возвращение после $gap дней, ×3", "Phoenix: back after $gap days, ×3") }
         if ("dragon" in species) teamExtra += .3
@@ -186,6 +194,9 @@ object Engine {
         f("crane", t.workoutsWith(Cat.BAL) >= 12)
         f("mole", t.early >= 10)
         f("owl", t.late >= 10)
+        f("cat", t.atHome >= 15)
+        f("fox", t.outside >= 15)
+        f("penguin", t.classes >= 10)
         f("hamster", t.weeks.best >= 6)
         f("phoenix", t.maxGap >= 21)
         f("mammoth", t.tonnage >= 250_000)
@@ -213,6 +224,9 @@ object Engine {
             "crane" -> r(t.workoutsWith(Cat.BAL).toDouble(), 12.0, "${t.workoutsWith(Cat.BAL)} / 12")
             "mole" -> r(t.early.toDouble(), 10.0, "${t.early} / 10")
             "owl" -> r(t.late.toDouble(), 10.0, "${t.late} / 10")
+            "cat" -> r(t.atHome.toDouble(), 15.0, "${t.atHome} / 15")
+            "fox" -> r(t.outside.toDouble(), 15.0, "${t.outside} / 15")
+            "penguin" -> r(t.classes.toDouble(), 10.0, "${t.classes} / 10")
             "hamster" -> r(t.weeks.best.toDouble(), 6.0, "${t.weeks.best} / 6")
             "phoenix" -> r(t.maxGap.toDouble(), 21.0, tr("перерыв ${t.maxGap} / 21 дн.", "break ${t.maxGap} / 21 days"))
             "mammoth" -> r(t.tonnage, 250_000.0, "${tonnage(t.tonnage)} / ${tonnage(250_000.0)}")

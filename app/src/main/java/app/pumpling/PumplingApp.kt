@@ -205,7 +205,7 @@ class AppContainer(context: Context) {
             val marked = done.map { it.copy(pr = marks[it.id]?.joinToString(",") { r -> r.id }.orEmpty()) }
             dao.updateSets(marked)
             val pets = dao.petList()
-            val (out0, fed) = Engine.feed(w, marked, before, beforeSets, pets, s)
+            val (out0, fed) = Engine.feed(w.copy(place = place.trim()), marked, before, beforeSets, pets, s)
             dao.updatePets(fed)
             val leader = Engine.team(fed).firstOrNull()?.species.orEmpty()
             val finished = w.copy(end = maxOf(end, w.start + 60_000), title = title.trim(), note = note.trim(), feel = feel, place = place.trim(),

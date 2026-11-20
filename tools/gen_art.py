@@ -46,6 +46,10 @@ PETS = {
     "phoenix": ("a small phoenix chick with orange-gold fiery feathers and a flame crest", "rising with wings spread wide, small flames around it"),
     "mammoth": ("a woolly mammoth calf with reddish-brown fur and small curved tusks", "squatting with a barbell across its shoulders"),
     "dragon": ("a small teal dragon with cream belly, tiny wings and little horns", "pressing a kettlebell overhead, a puff of flame from its nose"),
+    # the pets of the places (#21)
+    "cat": ("a fluffy ginger house cat with a pink headband and white paws", "stretching in a cat-cow pose on a small round rug, a cushion beside it"),
+    "fox": ("a red fox with a green running cap and white sneakers", "jogging on a park trail, a tiny water bottle in one paw"),
+    "penguin": ("a round penguin with a red headband and a whistle on a cord", "leading an aerobics class, clapping its flippers above its head"),
 }
 
 
@@ -97,6 +101,20 @@ Image: a background scene for a cozy fitness app: an outdoor workout spot in a c
 The scene: blue sky with a few soft clouds at the top, green trees and bushes on the left and right edges, distant low town houses on the horizon, a sandy path and soft green grass in the front.
 IMPORTANT: keep it mostly EMPTY: no people, no animals, no text. The centre of the ground must be clear, free space (characters will stand there).
 Only small details near the edges: a simple pull-up bar on the far left, a park bench and a lamp post on the right, a water bottle by the bench.""",
+    "group": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
+
+Image: a background scene for a cozy fitness app: a small bright group fitness studio, seen from the front, side-on like a 2D game room.
+""" + STYLE + """ Landscape 3:2.
+The room: a long wall mirror on the back wall, pale wooden floor, soft daylight from tall windows, warm and friendly, the same cozy mood as a basement home gym.
+IMPORTANT: keep the room mostly EMPTY: no people, no animals, no text. The centre of the floor must be clear, free space (characters will stand there).
+Only small details near the edges: a stack of colourful steps and rolled mats on the left, a speaker and a small whiteboard (no writing) on the right, a row of small dumbbells on a low rack.""",
+    "eggs_place": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
+
+Image: a sprite sheet of 3 pet eggs for a cozy fitness app, in the same set as other patterned pet eggs.
+""" + STYLE + """
+Layout: 3 columns x 1 row of equal square cells on a flat solid pure magenta (#FF00FF) background. One egg per cell, centered, with clear margin; no text, no grid lines, no nests.
+Each egg is the same size and egg-shaped, with its own pattern and colours that hint at the creature inside, in this order (left to right):
+1 ginger with cream tabby stripes and a pink dot (cat), 2 russet red with a white tip and a green band (fox), 3 black and white with a red band (penguin).""",
     "items": """Use your image generation tool to create ONE image. Do nothing else (no file copying).
 
 Image: a sprite sheet of 16 home-gym objects for a cozy fitness app, each a separate object, seen from the front (side-on like a 2D game room).
