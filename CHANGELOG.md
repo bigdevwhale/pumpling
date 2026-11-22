@@ -6,6 +6,18 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.11.0] - 2026-11-22
+
+### Added
+- **Back extension machine (#23):** a new exercise for the lower back, with how to do it and its own picture.
+- **A past workout from the start sheet (#20):** «A past one» beside «Already done» – pick the day and time, then log the exercises as usual. «Already done» can be put on another day too. The journal's link says «+ a past workout».
+
+<!-- tg
+Новое упражнение «Разгибание спины в тренажёре»
+Прошедшую тренировку теперь можно записать прямо из окна «Начать тренировку?» – чип «Прошедшая»: день, время и упражнения
+«Уже сделано» тоже можно отметить вчерашним или любым другим днём
+-->
+
 ## [1.10.0] - 2026-11-20
 
 ### Added

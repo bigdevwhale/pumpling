@@ -93,7 +93,7 @@ fun JournalScreen(d: Data, nav: Nav) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(Modifier.padding(top = 14.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("Журнал", "Log"), style = T.title, modifier = Modifier.weight(1f))
-            if (tab == 0) Text(tr("+ прошедшая", "+ past one"), style = T.smallB.copy(color = C.acc), modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { past = true }.padding(8.dp))
+            if (tab == 0) Text(tr("+ прошедшая тренировка", "+ a past workout"), style = T.smallB.copy(color = C.acc), modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { past = true }.padding(8.dp))
         }
         Segments(listOf(tr("История", "History"), tr("Программы", "Routines"), tr("Свои", "Own")), tab, Modifier.padding(vertical = 10.dp)) { tab = it }
         when (tab) {

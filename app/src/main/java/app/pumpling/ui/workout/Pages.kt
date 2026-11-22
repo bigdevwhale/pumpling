@@ -295,6 +295,15 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
     var doneEx by remember { mutableStateOf(QUICK.first()) }
     var doneMins by remember { mutableStateOf(10) }
     var donePlace by remember { mutableStateOf(d.finished.maxByOrNull { it.start }?.place.orEmpty()) }
+    // a day other than today (#20): for «already done» and for a past workout written exercise by exercise
+    var day by remember { androidx.compose.runtime.mutableLongStateOf(app.pumpling.domain.today()) }
+    var at0 by remember { mutableStateOf(18 * 60) }
+    val isToday = day == app.pumpling.domain.today()
+    @Composable fun DayRow() = Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Chip(tr("сегодня", "today"), isToday) { day = app.pumpling.domain.today() }
+        Chip(tr("вчера", "yesterday"), day == app.pumpling.domain.today() - 1) { day = app.pumpling.domain.today() - 1 }
+        app.pumpling.ui.components.DayPick(day) { day = it }
+    }
     val r = d.routines.firstOrNull { it.id == pick }
     val plans = r?.let { Plan.parse(it.items) }.orEmpty()
     app.pumpling.ui.components.Sheet({ nav.askStart = null }) {
@@ -302,6 +311,7 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Chip(tr("Без программы", "No routine"), pick == 0L, color = C.ok) { pick = 0L }
             Chip(tr("Уже сделано", "Already done"), pick == -2L, color = C.ok) { pick = -2L }
+            Chip(tr("Прошедшая", "A past one"), pick == -3L, color = C.ok) { pick = -3L; if (isToday) day = app.pumpling.domain.today() - 1 }
             Chip(tr("Групповое занятие", "Group class"), pick == -1L, color = C.ok) { pick = -1L }
             d.routines.forEach { x -> Chip(x.name, pick == x.id) { pick = x.id } }
         }
@@ -317,6 +327,18 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
                 app.pumpling.ui.components.MinutesPick(doneMins, listOf(5, 10, 15, 20, 30)) { doneMins = it }
                 Text(tr("Где", "Where"), style = T.bodyB, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
                 app.pumpling.ui.components.PlacePick(donePlace) { donePlace = it }
+                Text(tr("Когда", "When"), style = T.bodyB, modifier = Modifier.padding(top = 6.dp, bottom = 6.dp))
+                DayRow()
+            }
+        }
+        if (pick == -3L) {
+            Column(Modifier.padding(top = 14.dp).fillMaxWidth().card(18.dp).padding(14.dp)) {
+                Text(tr("Забыли записать? Выберите день и время – упражнения и подходы впишете следом, как обычно.",
+                    "Forgot to log it? Pick the day and time – then fill in the exercises and sets as usual."), style = T.body)
+                Text(tr("Когда была?", "When was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                DayRow()
+                Text(tr("Во сколько началась?", "Started at"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                app.pumpling.ui.components.TimePick(at0) { at0 = it }
             }
         }
         if (pick == -1L) {
@@ -351,8 +373,15 @@ fun StartSheet(first: Long, d: Data, nav: Nav) {
             if (pick == -2L) Btn(tr("Отметить", "Log it"), Modifier.weight(1.4f), color = C.ok) {
                 nav.askStart = null
                 val ex = doneEx; val m = doneMins; val p = donePlace
-                c.write { val r = logDone(ex, m, p)
+                // on another day it ended in the evening, unless it's today
+                val end = if (isToday) System.currentTimeMillis() else java.time.LocalDate.ofEpochDay(day).atTime(19, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() + m * 60_000L
+                c.write { val r = logDone(ex, m, p, end)
                     if (r != null) nav.push(Screen.Result(r.first, r.second)) else say(tr("Сначала закончите текущую тренировку", "Finish the current workout first")) }
+            } else if (pick == -3L) Btn(tr("Дальше", "Next"), Modifier.weight(1.4f), color = C.ok) {
+                nav.askStart = null
+                val at = java.time.LocalDate.ofEpochDay(day).atTime(at0 / 60, at0 % 60).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                c.write { val id = start(null, at); dao.workout(id)?.let { dao.update(it.copy(manual = true)) } }
+                nav.push(Screen.Live)
             } else Btn(tr("Начать", "Start"), Modifier.weight(1.4f)) {
                 nav.askStart = null
                 if (pick == -1L) { val k = kind; val n = name.ifBlank { Catalog.of(k).name }; c.write { startClass(k, n) } } else c.write { start(r) }
