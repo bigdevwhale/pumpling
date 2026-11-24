@@ -89,7 +89,8 @@ sealed class Screen {
     data object Settings : Screen()
     data class RoutineEdit(val id: Long) : Screen()
     /** Picks exercises: for the live workout, a finished one being edited ([into]), or a routine being edited. */
-    data class Picker(val forRoutine: Boolean = false, val into: Long = 0) : Screen()
+    /** [replace] ≥ 0: one exercise to put in place of that block of workout [into] (0 = the live one) (#28). */
+    data class Picker(val forRoutine: Boolean = false, val into: Long = 0, val replace: Int = -1) : Screen()
     data class OwnEdit(val id: Long) : Screen()
     data object BodyLog : Screen()
     data object Achievements : Screen()
@@ -178,7 +179,7 @@ fun Root(s: Settings) {
                 Screen.Shop -> ShopPage(data, nav)
                 Screen.Settings -> SettingsPage(data, nav)
                 is Screen.RoutineEdit -> RoutinePage(scr.id, data, nav)
-                is Screen.Picker -> PickerPage(scr.forRoutine, data, nav, scr.into)
+                is Screen.Picker -> PickerPage(scr.forRoutine, data, nav, scr.into, scr.replace)
                 is Screen.OwnEdit -> OwnExPage(scr.id, data, nav)
                 Screen.BodyLog -> BodyPage(data, nav)
                 Screen.Achievements -> app.pumpling.ui.stats.AchievementsPage(data, nav)

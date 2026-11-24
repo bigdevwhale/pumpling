@@ -97,6 +97,14 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
     /** day → working sets that day (for the heat map). */
     val heat: Map<Long, Int> by lazy { val m = HashMap<Long, Int>(); for (x in allDone) if (!x.warmup) { val d = dayOfSet(x); m[d] = (m[d] ?: 0) + 1 }
         for (w in finished) { val d = dayOf(w.start); if (d !in m) m[d] = 1 }; m }
+    /** day → where most of that day's time was trained, for days with a place said (#24). */
+    val placeOfDay: Map<Long, Place> by lazy {
+        finished.filter { Place.of(it.place) != null }.groupBy { dayOf(it.start) }
+            .mapValues { (_, l) -> l.groupBy { Place.of(it.place)!! }.maxBy { (_, ws) -> ws.sumOf { max(1L, it.end - it.start) } }.key }
+    }
+    /** Seconds trained in each place over the span, biggest first; workouts with no place said aren't in it (#26). */
+    val secsByPlace: List<Pair<Place, Long>> get() = workouts.mapNotNull { w -> Place.of(w.place)?.let { it to max(0L, (w.end - w.start) / 1000) } }
+        .groupBy({ it.first }, { it.second }).map { (p, l) -> p to l.sum() }.filter { it.second > 0 }.sortedByDescending { it.second }
     val weekdays: IntArray get() = IntArray(7).also { a -> workouts.forEach { a[LocalDate.ofEpochDay(dayOf(it.start)).dayOfWeek.value - 1]++ } }
     /** Workouts by start hour, 24 buckets. */
     val hours: IntArray get() = IntArray(24).also { a -> workouts.forEach { a[hourOf(it.start)]++ } }
@@ -244,7 +252,7 @@ class Stats(allWorkouts: List<Workout>, allSets: List<WSet>, val bodies: List<Bo
         val squats = work.filter { it.exId.contains("squat") }.sumOf { it.reps }
         if (squats >= 20) out += tr("${fmt(squats)} приседаний – как ${fmt(squats / 20)} этажей по лестнице", "${fmt(squats)} squats, like climbing ${fmt(squats / 20)} floors")
         journey()?.let { (to, f) -> out += if (f >= 1) tr("Пройдено и пробежано ${km(meters)}: это $to", "You've covered ${km(meters)}: that's $to") else tr("${km(meters)} – ${(f * 100).toInt()}% пути $to", "${km(meters)} – ${(f * 100).toInt()}% of $to") }
-        if (secs > 0) out += tr("${hours(secs)} в зале – это ${fmt1(secs / 3600.0 / 1.5)} фильмов", "${hours(secs)} training – ${fmt1(secs / 3600.0 / 1.5)} films' worth")
+        if (secs > 0) out += tr("${hours(secs)} тренировок – это ${fmt1(secs / 3600.0 / 1.5)} фильмов", "${hours(secs)} training – ${fmt1(secs / 3600.0 / 1.5)} films' worth")
         if (kcal > 500) out += tr("≈ ${fmt(kcal.toLong())} ккал – это ${fmt((kcal / 280).toLong())} пельменных порций", "≈ ${fmt(kcal.toLong())} kcal – ${fmt((kcal / 280).toLong())} plates of dumplings")
         return out
     }

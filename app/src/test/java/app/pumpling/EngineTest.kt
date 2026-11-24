@@ -6,6 +6,7 @@ import app.pumpling.data.WSet
 import app.pumpling.data.Workout
 import app.pumpling.domain.Catalog
 import app.pumpling.domain.Engine
+import app.pumpling.domain.Place as P
 import app.pumpling.domain.Rec
 import app.pumpling.domain.Records
 import app.pumpling.domain.Stage
@@ -34,6 +35,17 @@ class EngineTest {
         val q = app.pumpling.domain.Quests.byId.getValue("volume")
         assertEquals(1000.0 + 80.0 * .7 * 20, q.progress(wk), 1e-6)
         assertEquals(q.progress(wk), sets.filter { !it.warmup }.sumOf { app.pumpling.domain.Tonnage.of(it, 80.0) }, 1e-6)
+    }
+
+    @Test fun timeAndDaysByPlace() {
+        // #24, #26: an hour in the gym and 20 minutes at home the same day, 30 minutes outside the next, one not said
+        val d0 = today() - 3; val ms = d0 * 86_400_000L + 10 * 3_600_000L
+        val ws = listOf(Workout(1, ms, ms + 3_600_000, place = "gym"), Workout(2, ms + 7_200_000, ms + 8_400_000, place = "home"),
+            Workout(3, ms + 86_400_000, ms + 88_200_000, place = "street"), Workout(4, ms + 2 * 86_400_000L, ms + 2 * 86_400_000L + 600_000))
+        val st = app.pumpling.domain.Stats(ws, emptyList(), emptyList(), Settings(), app.pumpling.domain.Span(d0 - 10, d0 + 10, app.pumpling.domain.Span.MONTH))
+        assertEquals(listOf(P.GYM to 3600L, P.STREET to 1800L, P.HOME to 1200L), st.secsByPlace)
+        val day = app.pumpling.domain.dayOf(ms)
+        assertEquals(P.GYM, st.placeOfDay[day]); assertEquals(P.STREET, st.placeOfDay[day + 1]); assertEquals(null, st.placeOfDay[day + 2])
     }
 
     @Test fun epley() {

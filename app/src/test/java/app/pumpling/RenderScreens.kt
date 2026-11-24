@@ -103,5 +103,13 @@ class RenderScreens {
         reqs.forEachIndexed { k, r -> listOf(false, true).forEach { story ->
             val bmp = Painter(rule.activity, data, Look(story, k % 6, false)).render(r).first
             File(cards, "${k}-${r.kind.name.lowercase()}${if (story) "-story" else ""}.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 90, it) } } }
+        // places said (#24, #26): the calendar in their colours and the time by place
+        runBlocking { c.dao.workoutList().filter { it.end > 0 }.sortedBy { it.start }.forEachIndexed { k, w -> c.dao.setPlace(w.id, listOf("gym", "home", "gym", "street", "group")[k % 5]) } }
+        Start.tab = 3; Start.open = null; rule.runOnUiThread { i = 300 }; shot("4g-stats-places")
+        Start.tab = 1; rule.runOnUiThread { i = 301 }; shot("2b-log-places")
+        // a rest that keeps counting past its end (#27)
+        app.pumpling.work.Rest.length = 90_000; app.pumpling.work.Rest.ended = System.currentTimeMillis() - 23_000
+        Start.tab = 0; Start.open = "live"; rule.runOnUiThread { i = 302 }; shot("14b-live-rest-over")
+        app.pumpling.work.Rest.ended = 0
     }
 }

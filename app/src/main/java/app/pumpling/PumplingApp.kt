@@ -155,13 +155,29 @@ class AppContainer(context: Context) {
         return out
     }
 
-    suspend fun addExercise(workoutId: Long, exId: String) {
-        val cur = dao.setsOfNow(workoutId); val block = (cur.maxOfOrNull { it.block } ?: -1) + 1
+    /** A new exercise at the end of the workout, or at [at] (a block already free) in superset group [superset]. */
+    suspend fun addExercise(workoutId: Long, exId: String, at: Int? = null, superset: Int = 0) {
+        val cur = dao.setsOfNow(workoutId); val block = at ?: ((cur.maxOfOrNull { it.block } ?: -1) + 1)
         val prev = lastSets()[exId].orEmpty().filter { !it.warmup }
         val ex = Catalog.of(exId)
         val n = if (prev.isNotEmpty()) prev.size.coerceAtMost(if (prev.any { it.side != 0 }) 12 else 6) else if (ex.kind.timed && ex.kind != Kind.HOLD) 1 else 3
         dao.insertSets((0 until n).map { i -> val p = prev.getOrNull(i)
-            WSet(workoutId = workoutId, exId = exId, block = block, idx = i, weight = p?.weight ?: 0.0, reps = p?.reps ?: 0, secs = p?.secs ?: 0, meters = p?.meters ?: 0.0, side = p?.side ?: 0) })
+            WSet(workoutId = workoutId, exId = exId, block = block, idx = i, weight = p?.weight ?: 0.0, reps = p?.reps ?: 0, secs = p?.secs ?: 0, meters = p?.meters ?: 0.0, side = p?.side ?: 0, superset = superset) })
+    }
+
+    /**
+     * Another exercise in place of [block] (#28). Editing a finished workout, its sets just change exercise.
+     * Live, the sets done stay with the old one and the new one comes right after it, filled from its last time;
+     * with nothing done yet, the new one takes the block's place. A superset stays one.
+     */
+    suspend fun replaceExercise(workoutId: Long, block: Int, exId: String, edit: Boolean = false) {
+        val all = dao.setsOfNow(workoutId); val l = all.filter { it.block == block }; if (l.isEmpty() || l.first().exId == exId) return
+        if (edit) { dao.updateSets(l.map { it.copy(exId = exId, pr = "") }); return }
+        val sup = l.first().superset
+        l.filter { !it.done }.forEach { dao.deleteSet(it.id) }
+        if (l.none { it.done }) { addExercise(workoutId, exId, block, sup); return }
+        dao.updateSets(all.filter { it.block > block }.map { it.copy(block = it.block + 1) })
+        addExercise(workoutId, exId, block + 1, sup)
     }
 
     /** A new set at the end of [block]; in a block done left and right, a new pair. */

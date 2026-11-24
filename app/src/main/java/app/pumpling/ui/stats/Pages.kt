@@ -163,7 +163,7 @@ fun WrappedPage(year: Int, d: Data, nav: Nav) {
     androidx.activity.compose.BackHandler { nav.pop() }
     val pages = buildList<Triple<String, String, String>> {
         add(Triple(tr("Ваш $year", "Your $year"), tr("в Pumpling", "in Pumpling"), tr("Листайте вправо", "Swipe right")))
-        add(Triple("${st.count}", tr("тренировок", "workouts"), tr("${st.activeDays} дней с движением и ${hours(st.secs)} в зале", "${st.activeDays} active days and ${hours(st.secs)} training")))
+        add(Triple("${st.count}", tr("тренировок", "workouts"), tr("${st.activeDays} дней с движением и ${hours(st.secs)} тренировок", "${st.activeDays} active days and ${hours(st.secs)} training")))
         if (st.tonnage > 0) add(Triple(tonnage(st.tonnage), tr("поднято за год", "lifted this year"), st.funFacts().firstOrNull() ?: ""))
         st.exercises.firstOrNull()?.let { add(Triple(it.ex.name, tr("упражнение года", "exercise of the year"), tr("${it.sets} подходов за ${it.workouts} тренировок", "${it.sets} sets in ${it.workouts} workouts"))) }
         if (st.prs > 0) add(Triple("${st.prs}", tr("рекордов", "records"), st.recordSets.firstOrNull()?.let { s -> val ex = Catalog.of(s.exId); val r = s.pr.split(',').mapNotNull { Rec.of(it) }.first()

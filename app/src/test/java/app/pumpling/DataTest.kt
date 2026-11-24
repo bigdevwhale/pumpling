@@ -46,6 +46,25 @@ class DataTest {
         assertEquals(listOf(60.0, 60.0), c.dao.setsOfNow(id2).map { it.weight })
     }
 
+    @Test fun anExerciseIsReplaced() = runBlocking {
+        // #28: live, with a set of squats done – it stays, the unticked ones go, leg press comes right after, bench moves down
+        val id = c.dao.insert(app.pumpling.data.Workout(start = 1_000))
+        c.addExercise(id, "squat"); c.addExercise(id, "bench")
+        c.dao.setsOfNow(id).first { it.exId == "squat" }.let { c.dao.update(it.copy(done = true, doneAt = 2_000)) }
+        c.replaceExercise(id, 0, "leg_press")
+        val l = c.dao.setsOfNow(id)
+        assertEquals(listOf("squat"), l.filter { it.block == 0 }.map { it.exId })
+        assertTrue(l.filter { it.block == 1 }.let { b -> b.isNotEmpty() && b.all { it.exId == "leg_press" && !it.done } })
+        assertTrue(l.filter { it.block == 2 }.all { it.exId == "bench" })
+        // nothing done yet: the new one takes the block's place
+        c.replaceExercise(id, 2, "dip")
+        assertTrue(c.dao.setsOfNow(id).filter { it.block == 2 }.let { b -> b.isNotEmpty() && b.all { it.exId == "dip" } })
+        // editing a finished workout: the sets keep their numbers under the other exercise
+        c.replaceExercise(id, 0, "hack_squat", edit = true)
+        assertEquals("hack_squat", c.dao.setsOfNow(id).single { it.block == 0 }.exId)
+        c.dao.deleteSetsOf(id); c.dao.deleteWorkout(id)
+    }
+
     @Test fun stretchingIsLoggedInOneGo() = runBlocking {
         val s0 = c.settings.now()
         val end = 50_000_000L

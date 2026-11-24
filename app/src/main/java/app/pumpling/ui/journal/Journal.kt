@@ -177,13 +177,19 @@ private fun Glance(d: Data) {
     val weeks = remember(d.finished, d.s) { app.pumpling.domain.Weeks(d.finished.map { dayOf(it.start) }.toSet(), d.s.weekGoal, d.s.sickDays) }
     Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(Triple(Icons.CAL, C.acc, "${month.size}" to tr("тренировок\nв этом месяце", "workouts\nthis month")),
-            Triple(Icons.CLOCK, C.ok, app.pumpling.domain.span(month.sumOf { it.end - it.start }) to tr("в зале\nза месяц", "training\nthis month")),
+            Triple(Icons.CLOCK, C.ok, app.pumpling.domain.span(month.sumOf { it.end - it.start }) to tr("на тренировках\nза месяц", "training\nthis month")),
             Triple(Icons.FLAME, C.gold, "${weeks.streak}" to tr("недель подряд\nс целью", "weeks in a row\non goal"))).forEach { (ic, col, v) ->
             Column(Modifier.weight(1f).fillMaxHeight().card(16.dp).padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(ic, col, 16.dp); Text("  " + v.first, style = T.bodyB, maxLines = 1) }
                 Text(v.second, style = T.tiny, modifier = Modifier.padding(top = 3.dp))
             }
         }
+    }
+    // this month's time by place (#26)
+    if (d.s.placeTimes) {
+        val byPlace = month.mapNotNull { w -> app.pumpling.domain.Place.of(w.place)?.let { it to maxOf(0L, (w.end - w.start) / 1000) } }
+            .groupBy({ it.first }, { it.second }).map { (p, l) -> p to l.sum() }.filter { it.second > 0 }.sortedByDescending { it.second }
+        app.pumpling.ui.components.PlaceTimes(byPlace, C.mute, Modifier.padding(top = 8.dp, start = 4.dp))
     }
 }
 
@@ -209,7 +215,7 @@ private fun ThisWeek(d: Data, st: Stats) {
             }
         }
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-            listOf(app.pumpling.domain.span(ws.sumOf { it.end - it.start }) to tr("в зале", "training"), tonnage(work.sumOf { st.tonnageOf(it) }) to tr("поднято", "lifted"),
+            listOf(app.pumpling.domain.span(ws.sumOf { it.end - it.start }) to tr("тренировок", "training"), tonnage(work.sumOf { st.tonnageOf(it) }) to tr("поднято", "lifted"),
                 "${ws.sumOf { it.prs }}" to tr("рекордов", "records")).forEach { (v, l) ->
                 Column { Text(v, style = T.numS.copy(color = Color.White)); Text(l, style = T.tiny.copy(color = Color(0xCCFFFFFF))) } }
         }

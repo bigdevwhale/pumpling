@@ -120,7 +120,9 @@ fun StatsScreen(d: Data, nav: Nav) {
             Section(if (Period.kind == Span.MONTH || Period.kind == Span.WEEK) tr("Календарь", "Calendar") else tr("По неделям", "By week"))
             Card {
                 val to = minOf(st.span.to, app.pumpling.domain.today()); val from = if (Period.kind == Span.ALL || st.span.days > 120) maxOf(st.span.from, to - 364) else st.span.from
-                if (Period.kind == Span.MONTH || Period.kind == Span.WEEK) MonthGrid(st, Period.kind) else Heat(st.heat, from, to)
+                if (Period.kind == Span.MONTH || Period.kind == Span.WEEK) MonthGrid(st, Period.kind) else Heat(st.heat, from, to, places = st.placeOfDay)
+                // the days are in the colour of where they were trained (#24)
+                app.pumpling.ui.components.PlaceLegend(st.placeOfDay.filterKeys { it in from..to }.values.toSet(), Modifier.padding(top = 8.dp))
             }
             Section(icon = Icons.DOTS, text = tr("Ещё", "More"))
             Card(pad = 4.dp) {
@@ -166,9 +168,11 @@ private fun Hero(st: Stats, prev: Stats?, d: Data, span: Span) {
                 Text(tr("$it к прошлому периоду", "$it vs the period before"), style = T.smallB.copy(color = Color.White), modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 10.dp, vertical = 4.dp)) }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                listOf(hours(st.secs) to tr("в зале", "training"), tonnage(st.tonnage) to tr("поднято", "lifted"), "${st.prs}" to tr("рекордов", "records")).forEach { (v, l) ->
+                listOf(hours(st.secs) to tr("тренировок", "training"), tonnage(st.tonnage) to tr("поднято", "lifted"), "${st.prs}" to tr("рекордов", "records")).forEach { (v, l) ->
                     Column { Text(v, style = T.num.copy(color = Color.White)); Text(l, style = T.tiny.copy(color = Color(0xCCFFFFFF))) } }
             }
+            // the time trained split by place (#26), unless it is turned off
+            if (d.s.placeTimes) app.pumpling.ui.components.PlaceTimes(st.secsByPlace, Color.White, Modifier.padding(top = 10.dp, end = 110.dp))
             Spacer(Modifier.height(4.dp))
         }
     }
@@ -417,8 +421,9 @@ private fun MonthGrid(st: Stats, kind: Int) {
             (0..6).forEach { col -> val i = row * 7 + col - lead; val day = st.span.from + i
                 Box(Modifier.weight(1f).padding(2.dp).height(36.dp), contentAlignment = Alignment.Center) {
                     if (i in 0 until n) { val v = st.heat[day] ?: 0; val future = day > app.pumpling.domain.today()
-                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(if (v == 0) C.card2 else C.heat[(1 + v * 3 / mx).coerceAtMost(4)]), contentAlignment = Alignment.Center) {
-                            Text("${LocalDate.ofEpochDay(day).dayOfMonth}", style = T.smallB.copy(color = if (v > 0 && v * 3 / mx >= 2) Color.White else if (future) C.line else C.mute)) } }
+                        val place = st.placeOfDay[day]
+                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(if (v == 0) C.card2 else app.pumpling.ui.components.dayColor(v, mx, place)), contentAlignment = Alignment.Center) {
+                            Text("${LocalDate.ofEpochDay(day).dayOfMonth}", style = T.smallB.copy(color = if (v > 0 && (place != null || v * 3 / mx >= 2)) Color.White else if (future) C.line else C.mute)) } }
                 }
             }
         }

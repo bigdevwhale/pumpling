@@ -249,7 +249,7 @@ fun Line(points: List<Pair<Double, Double>>, modifier: Modifier = Modifier, colo
 
 /** A GitHub-like year of days, weeks as columns. */
 @Composable
-fun Heat(days: Map<Long, Int>, from: Long, to: Long, modifier: Modifier = Modifier) {
+fun Heat(days: Map<Long, Int>, from: Long, to: Long, modifier: Modifier = Modifier, places: Map<Long, app.pumpling.domain.Place> = emptyMap()) {
     val start = app.pumpling.domain.weekStart(from); val weeks = ((to - start) / 7 + 1).toInt()
     val max = max(1, days.filterKeys { it in from..to }.values.maxOrNull() ?: 1)
     Box(modifier.fillMaxWidth()) {
@@ -258,7 +258,7 @@ fun Heat(days: Map<Long, Int>, from: Long, to: Long, modifier: Modifier = Modifi
             for (w in 0 until weeks) for (d in 0 until 7) {
                 val day = start + w * 7 + d; if (day < from || day > to) continue
                 val v = days[day] ?: 0
-                val col = if (v == 0) C.heat[0] else C.heat[(1 + (v * 3.99 / max).toInt()).coerceAtMost(4)]
+                val col = dayColor(v, max, places[day])
                 drawRoundRect(col, Offset(w * cell, d * cell), Size(cell - gap, cell - gap), CornerRadius(cell * .22f))
             }
         }
@@ -360,6 +360,49 @@ fun Hint(id: String, seen: Set<String>, icon: Icons, title: String, text: String
             Text(text, style = T.small.copy(color = C.ink), modifier = Modifier.padding(top = 2.dp))
             Text(tr("Понятно", "Got it"), style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).clickable {
                 c.write { settings.update { st -> st.copy(seen = st.seen + id) } } }.padding(horizontal = 4.dp, vertical = 2.dp))
+        }
+    }
+}
+
+/** The colour of a place's days (#24): its own, or the heat map's tomato for the gym. */
+fun placeColor(p: app.pumpling.domain.Place): Color = if (p.color != 0L) Color(p.color) else C.heat[3]
+
+/**
+ * A day in a calendar: [v] sets against the busiest day [max], in its place's colour when one was said (#24),
+ * else in the heat map's own steps.
+ */
+fun dayColor(v: Int, max: Int, place: app.pumpling.domain.Place?): Color = when {
+    v == 0 -> C.heat[0]
+    place == null -> C.heat[(1 + (v * 3.99 / max).toInt()).coerceAtMost(4)]
+    else -> placeColor(place).copy(alpha = .6f + .4f * (v.toFloat() / max).coerceIn(0f, 1f))
+}
+
+/** «● Gym 6 h  ● Home 2 h …»: the time trained by place (#26), on one line that wraps. [ink] for the text. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun PlaceTimes(times: List<Pair<app.pumpling.domain.Place, Long>>, ink: Color = C.ink, modifier: Modifier = Modifier) {
+    if (times.isEmpty()) return
+    androidx.compose.foundation.layout.FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        times.forEach { (p, secs) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(placeColor(p)).border(1.dp, ink.copy(alpha = .35f), CircleShape))
+                Text(" ${p.label} ${app.pumpling.domain.hours(secs)}", style = T.tiny.copy(color = ink))
+            }
+        }
+    }
+}
+
+/** What the colours of a calendar mean, for the places that are in it (#24). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun PlaceLegend(places: Collection<app.pumpling.domain.Place>, modifier: Modifier = Modifier) {
+    if (places.isEmpty()) return
+    androidx.compose.foundation.layout.FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        app.pumpling.domain.Place.entries.filter { it in places }.forEach { p ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(placeColor(p)))
+                Text(" " + p.label, style = T.tiny)
+            }
         }
     }
 }

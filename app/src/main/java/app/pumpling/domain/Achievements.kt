@@ -48,7 +48,7 @@ object Achievements {
             listOf(1.0, 10.0, 25.0, 50.0, 100.0, 200.0, 365.0, 500.0)) { it.t.workouts.size.toDouble() },
         Achievement("streak", "Недели по плану", "Weeks to plan", "Самая длинная серия недель с выполненной целью", "The longest run of weeks with the goal met",
             listOf(2.0, 4.0, 8.0, 12.0, 26.0, 52.0)) { it.t.weeks.best.toDouble() },
-        Achievement("hours", "Время в зале", "Time training", "Часы всех тренировок вместе", "Hours of all the workouts together",
+        Achievement("hours", "Время тренировок", "Time training", "Часы всех тренировок вместе", "Hours of all the workouts together",
             listOf(10.0, 50.0, 100.0, 250.0, 500.0), ::h) { d -> d.t.workouts.sumOf { it.end - it.start } / 3600_000.0 },
         Achievement("sets", "Подходы", "Sets", "Рабочие подходы за всё время", "Working sets of all time",
             listOf(100.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0)) { it.t.work.size.toDouble() },

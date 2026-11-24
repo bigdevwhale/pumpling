@@ -47,6 +47,8 @@ data class Settings(
     val remindAt: Int = 18 * 60,                // minutes after midnight the reminder comes at
     val health: Boolean = false,                // finished workouts are written to Health Connect
     val achieved: Set<String> = emptySet(),     // achievement tiers paid: «workouts:2»
+    val restOver: Boolean = false,              // an ended rest keeps counting, in red, until the next set (#27)
+    val placeTimes: Boolean = true,             // time by place under the time trained (#26); off for those it presses on
 ) {
     fun json(): JSONObject = JSONObject().apply {
         put("onboarded", onboarded); put("plates", plates); put("items", JSONArray(items.toList())); put("hidden", JSONArray(hidden.toList()))
@@ -56,6 +58,7 @@ data class Settings(
         put("yearGoal", yearGoal); put("bar", bar); put("plateSet", plateSet); put("cardBg", cardBg); put("hideWeights", hideWeights)
         put("town", town); if (!lat.isNaN()) { put("lat", lat); put("lon", lon) }; put("guessed", guessed); put("outside", outside); put("gear", JSONArray(gear)); put("goals", JSONArray(goals.toList())); put("checkIn", checkIn)
         put("weather", weather); put("remindDays", JSONArray(remindDays.toList())); put("remindAt", remindAt); put("health", health); put("achieved", JSONArray(achieved.toList()))
+        put("restOver", restOver); put("placeTimes", placeTimes)
     }
 
     companion object {
@@ -69,7 +72,8 @@ data class Settings(
                 j.optDouble("bar", 20.0), j.optString("plateSet", "25,20,15,10,5,2.5,1.25"), j.optInt("cardBg"), j.optBoolean("hideWeights"),
                 j.optString("town"), j.optDouble("lat", Double.NaN), j.optDouble("lon", Double.NaN), j.optBoolean("guessed"), j.optString("outside"), list("gear"), set("goals"), j.optInt("checkIn"),
                 j.optBoolean("weather", true), (j.optJSONArray("remindDays")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: emptyList()).toSet(),
-                j.optInt("remindAt", 18 * 60), j.optBoolean("health"), set("achieved"))
+                j.optInt("remindAt", 18 * 60), j.optBoolean("health"), set("achieved"),
+                j.optBoolean("restOver"), j.optBoolean("placeTimes", true))
         }
     }
 }

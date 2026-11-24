@@ -167,6 +167,13 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
             Spacer(Modifier.height(8.dp))
             Ghost(tr("Как делать, мышцы и история", "How to, muscles and history"), Modifier.fillMaxWidth()) { menu = null; nav.push(Screen.Exercise(l.first().exId)) }
             Spacer(Modifier.height(8.dp))
+            // #28: the machine is taken, or it hurts – another exercise in its place
+            Ghost(tr("Заменить упражнение", "Replace the exercise"), Modifier.fillMaxWidth()) { menu = null; nav.push(Screen.Picker(into = if (edit) w.id else 0, replace = b)) }
+            Text(if (edit) tr("Подходы останутся, только запишутся на другое упражнение.", "The sets stay, logged under the other exercise.")
+                else if (l.any { it.done }) tr("Сделанные подходы останутся, а неотмеченные перейдут на новое упражнение.", "Sets done stay; the unticked ones move to the new exercise.")
+                else tr("Подходы подставятся из прошлого раза для нового упражнения.", "Sets come from last time with the new exercise."),
+                style = T.tiny, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+            Spacer(Modifier.height(8.dp))
             val split = l.any { it.side != 0 }
             Ghost(if (split) tr("Обе стороны вместе", "Both sides together") else tr("Левая и правая отдельно", "Left and right apart"), Modifier.fillMaxWidth()) { c.write { split(w.id, b, !split) }; menu = null }
             if (!split) Text(tr("Для упражнений на одну руку или ногу: каждый подход станет парой Л и П.", "For one-arm or one-leg work: each set becomes an L and R pair."),
@@ -221,6 +228,21 @@ fun WorkoutScreen(d: Data, nav: Nav, editId: Long = 0) {
     if (finishing) { if (edit) EditSheet(w, d, nav) { finishing = false } else FinishSheet(d, nav) { finishing = false } }
 }
 
+/** The rest is over but still counted: how much more than planned, and the whole rest so far. */
+@Composable
+private fun OverBar(d: Data, now: Long) {
+    val ctx = LocalContext.current
+    val over = ((now - Rest.ended) / 1000).toInt()
+    Row(Modifier.padding(horizontal = 14.dp, vertical = 4.dp).fillMaxWidth().card(22.dp, C.bad).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        d.leader?.let { PetView(it, 54.dp, Pose.IDLE) }
+        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(tr("Отдых · всего ", "Rest · in all ") + clock((Rest.length / 1000).toInt() + over), style = T.small.copy(color = Color.White))
+            Text("+" + clock(over), style = T.num.copy(color = Color.White))
+        }
+        Text(tr("К подходу", "Next set"), style = T.smallB.copy(color = C.bad), modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { Rest.stop(ctx) }.padding(horizontal = 14.dp, vertical = 9.dp))
+    }
+}
+
 /** Moves an exercise block up or down in the live workout. */
 private suspend fun app.pumpling.AppContainer.swap(wid: Long, b: Int, dir: Int) {
     val all = dao.setsOfNow(wid); val order = all.map { it.block }.distinct().sorted()
@@ -232,6 +254,8 @@ private suspend fun app.pumpling.AppContainer.swap(wid: Long, b: Int, dir: Int) 
 @Composable
 private fun RestBar(d: Data, now: Long) {
     val ctx = LocalContext.current
+    // a rest that keeps counting (#27): red, the time over the set rest, until the next set; it lets go after half an hour
+    if (Rest.until <= now && Rest.ended in 1..now && now - Rest.ended < 30 * 60_000L) { OverBar(d, now); return }
     if (Rest.until <= now) return
     val left = ((Rest.until - now) / 1000).toInt() + 1
     Row(Modifier.padding(horizontal = 14.dp, vertical = 4.dp).fillMaxWidth().card(22.dp, C.ink).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -344,7 +368,7 @@ private fun SetRow(s: WSet, ex: Ex, label: String, best: app.pumpling.domain.Bes
             // an empty set takes the numbers it showed as a hint
             c.write { dao.update(upd) }
             // no timer when rests are turned off, and none inside a superset until its last exercise
-            if (live && !s.done && rest && d.s.rest > 0 && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest, d.s.restSound)
+            if (live && !s.done && rest && d.s.rest > 0 && (ex.kind == Kind.WEIGHT || ex.kind == Kind.BODY || ex.kind == Kind.ASSIST || ex.kind == Kind.HOLD)) Rest.start(ctx, d.s.rest, d.s.restSound, d.s.restOver)
         }, contentAlignment = Alignment.Center) { Icon(Icons.CHECK, if (s.done) Color.White else C.mute, 22.dp) }
     }
 }

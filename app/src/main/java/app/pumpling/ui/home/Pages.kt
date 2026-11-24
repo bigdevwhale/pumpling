@@ -244,6 +244,13 @@ fun SettingsPage(d: Data, nav: Nav) {
                                     Text(tr("Без звука телефон только вибрирует", "Without it the phone only buzzes"), style = T.tiny) }
                                 Chip(if (s.restSound) tr("да", "yes") else tr("нет", "no"), s.restSound) { set { it.copy(restSound = !it.restSound) } }
                             }
+                            // #27: the rest goes on past its end, in red, so the real rest can be seen
+                            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) { Text(tr("Считать отдых дальше", "Keep counting the rest"), style = T.smallB)
+                                    Text(tr("После сигнала таймер не пропадает, а краснеет и считает, сколько вы отдыхаете сверху – до кнопки «К подходу» или следующей галочки",
+                                        "After the signal the timer stays, turns red and counts the extra rest – until «Next set» or the next tick"), style = T.tiny) }
+                                Chip(if (s.restOver) tr("да", "yes") else tr("нет", "no"), s.restOver) { set { it.copy(restOver = !it.restOver) } }
+                            }
                             // Android 12+ may hold exact alarms back: then the signal can come late with the screen off
                             var exact by remember { mutableStateOf(Rest.exact(ctx)) }
                             androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { exact = Rest.exact(ctx); onPauseOrDispose { } }
@@ -335,6 +342,8 @@ fun SettingsPage(d: Data, nav: Nav) {
                 Setting(Icons.GLOBE, C.ok, tr("Язык", "Language")) {
                     val lang = currentLanguage()
                     Segments(listOf(tr("системный", "system"), "Русский", "English"), when (lang) { "ru" -> 1; "en" -> 2; else -> 0 }) { i -> setLanguage(listOf("", "ru", "en")[i]) } }
+                Setting(Icons.CLOCK, C.ok, tr("Время по местам", "Time by place"), tr("Под временем тренировок: сколько было в зале, дома, на улице и в группе", "Under the time trained: how much in the gym, at home, outside and in class")) {
+                    Chip(if (s.placeTimes) tr("показывать", "show") else tr("скрыто", "hidden"), s.placeTimes) { set { it.copy(placeTimes = !it.placeTimes) } } }
                 val o = app.pumpling.data.Outside.of(s.outside)
                 Setting(Icons.SUN, C.gold, tr("За окном зала", "Outside the gym window"),
                     (if (s.town.isNotEmpty()) s.town else tr("Город не выбран", "No town chosen")) + (o?.takeIf { s.weather }?.let { " · ${weatherWord(it.weather)}" + (if (it.temp.isNaN()) "" else ", ${Math.round(it.temp)}°") } ?: "")) {

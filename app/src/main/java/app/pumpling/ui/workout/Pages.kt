@@ -72,7 +72,7 @@ import app.pumpling.ui.theme.C
 import app.pumpling.ui.theme.T
 
 @Composable
-fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav, into: Long = 0) {
+fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav, into: Long = 0, replace: Int = -1) {
     val c = LocalContext.current.container
     var q by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf(-1) }
@@ -84,7 +84,8 @@ fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav, into: Long = 0) {
     val list = all.filter { e -> e.matches(q) &&
         (cat < 0 || e.cat == Cat.entries[cat]) && (eq < 0 || (if (eq < Equip.entries.size) e.equip == Equip.entries[eq] && e.gear.isEmpty() else e.gear == d.s.gear.getOrNull(eq - Equip.entries.size))) }
         .sortedWith(compareByDescending<app.pumpling.domain.Ex> { if (q.isBlank() && cat < 0 && eq < 0) (if (it.id in recent) 1000 - recent.indexOf(it.id) else 0) else 0 }.thenByDescending { used[it.id] ?: 0 })
-    Page(tr("Упражнения", "Exercises"), { nav.pop() }, scroll = false, action = {
+    val swapping = replace >= 0
+    Page(if (swapping) tr("Заменить на…", "Replace with…") else tr("Упражнения", "Exercises"), { nav.pop() }, scroll = false, action = {
         Text(tr("Своё", "Own"), style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(end = 12.dp).clip(RoundedCornerShape(10.dp)).clickable { nav.push(Screen.OwnEdit(0)) }.padding(8.dp)) }) {
         Field(q, { q = it }, tr("Найти: жим, присед, бег…", "Search: press, squat, run…"), Modifier.fillMaxWidth())
         ChipRow(listOf(tr("Все", "All")) + Cat.entries.map { it.label }, cat + 1, Modifier.padding(top = 8.dp)) { cat = it - 1 }
@@ -99,18 +100,21 @@ fun PickerPage(forRoutine: Boolean, d: Data, nav: Nav, into: Long = 0) {
             }
             items(list, key = { it.id }) { e ->
                 val on = e.id in picked
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (on) C.accSoft else Color.Transparent).clickable { if (on) picked.remove(e.id) else picked.add(e.id) }
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (on) C.accSoft else Color.Transparent).clickable {
+                        // a replacement is one exercise: a tap puts it in and goes back (#28)
+                        if (swapping) { val wid = if (into != 0L) into else d.live?.id; c.write { if (wid != null) replaceExercise(wid, replace, e.id, edit = into != 0L) }; nav.pop() }
+                        else if (on) picked.remove(e.id) else picked.add(e.id) }
                     .padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     app.pumpling.ui.art.ExThumb(e, 52.dp)
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
                         Text(e.name, style = T.bodyB)
                         Text((e.primary.map { it.label } + e.equipLabel).joinToString(" · ") + (used[e.id]?.let { tr(" · $it подх.", " · $it sets") } ?: ""), style = T.small, maxLines = 1)
                     }
-                    Box(Modifier.size(26.dp).clip(CircleShape).background(if (on) C.acc else C.card2), contentAlignment = Alignment.Center) { if (on) Icon(Icons.CHECK, Color.White, 16.dp) }
+                    if (!swapping) Box(Modifier.size(26.dp).clip(CircleShape).background(if (on) C.acc else C.card2), contentAlignment = Alignment.Center) { if (on) Icon(Icons.CHECK, Color.White, 16.dp) }
                 }
             }
         }
-        Btn(if (picked.isEmpty()) tr("Выберите упражнения", "Pick exercises") else tr("Добавить (${picked.size})", "Add (${picked.size})"), Modifier.fillMaxWidth().padding(vertical = 10.dp), enabled = picked.isNotEmpty()) {
+        if (!swapping) Btn(if (picked.isEmpty()) tr("Выберите упражнения", "Pick exercises") else tr("Добавить (${picked.size})", "Add (${picked.size})"), Modifier.fillMaxWidth().padding(vertical = 10.dp), enabled = picked.isNotEmpty()) {
             val ids = picked.toList()
             if (forRoutine) { nav.picked = nav.picked + ids; nav.pop() }
             else { val wid = if (into != 0L) into else d.live?.id; c.write { if (wid != null) ids.forEach { addExercise(wid, it) } }; nav.pop() }

@@ -302,7 +302,7 @@ class Painter(private val ctx: Context, private val d: Data, private val look: L
         } else {
             c.panel(60f, y, W - 120f, 300f); c.bars(st.buckets { ws, _ -> ws.size.toDouble() }, 90f, y + 30, W - 180f, 260f); y += 330
         }
-        val four = listOf(hours(st.secs) to tr("в зале", "training"), (if (st.tonnage > 0) hide(tonnage(st.tonnage)) else "${st.prs}") to (if (st.tonnage > 0) tr("поднято", "lifted") else tr("рекордов", "records")),
+        val four = listOf(hours(st.secs) to tr("тренировок", "training"), (if (st.tonnage > 0) hide(tonnage(st.tonnage)) else "${st.prs}") to (if (st.tonnage > 0) tr("поднято", "lifted") else tr("рекордов", "records")),
             fmt(st.setsN) to tr("рабочих подходов", "working sets"), (if (st.meters > 0) km(st.meters) else "${st.prs}") to (if (st.meters > 0) tr("кардио", "cardio") else tr("рекордов", "records")))
         y = if (look.story || sp.kind != Span.MONTH) c.grid(four, y + 10) else { c.facts(four.take(2) + four.last(), y + 10, 150f); y + 180 }
         if (look.story || sp.kind == Span.WEEK) c.roomPet(d.leader, Pose.CHEER, y, 520f)
@@ -321,7 +321,7 @@ class Painter(private val ctx: Context, private val d: Data, private val look: L
             val v = st.heat[day] ?: 0
             c.drawRoundRect(RectF(60 + w * cell, top + 180 + k * cell, 60 + w * cell + cell - 3, top + 180 + k * cell + cell - 3), 4f, 4f,
                 Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (v == 0) panel else accent; if (v > 0) alpha = (90 + 165 * v / mx).coerceAtMost(255) }) }
-        var y = c.grid(listOf(hours(st.secs) to tr("в зале", "training"), hide(tonnage(st.tonnage)) to tr("поднято", "lifted"), "${st.prs}" to tr("рекордов", "records"),
+        var y = c.grid(listOf(hours(st.secs) to tr("тренировок", "training"), hide(tonnage(st.tonnage)) to tr("поднято", "lifted"), "${st.prs}" to tr("рекордов", "records"),
             (if (st.meters > 0) km(st.meters) else fmt(st.setsN)) to (if (st.meters > 0) tr("кардио", "cardio") else tr("подходов", "sets"))), top + 220 + 7 * cell)
         c.t(tr("Любимые упражнения", "Favourite exercises"), 60f, y + 30, 34f, bold, sub); y += 90
         st.exercises.take(3).forEachIndexed { i, e -> c.t("${i + 1}. ${e.ex.name}", 60f, y, 42f, bold, maxW = 700f); c.t(tr("${e.sets} подх.", "${e.sets} sets"), W - 60f, y, 34f, num, sub, Paint.Align.RIGHT); y += 62 }

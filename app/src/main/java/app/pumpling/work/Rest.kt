@@ -35,6 +35,11 @@ object Rest {
     /** When the rest ends, System.currentTimeMillis; 0 when not resting. */
     var until by mutableLongStateOf(0L)
     var length by mutableLongStateOf(0L)
+    /**
+     * When a rest that keeps counting (#27) ran out, System.currentTimeMillis; 0 otherwise.
+     * The bar then stays, red, counting the extra rest until the next set or «Next set».
+     */
+    var ended by mutableLongStateOf(0L)
     /** The app is on the screen: the end of a rest sounds by itself, without a notification. */
     @Volatile var shown = false
     private const val CH = "rest"; private const val CH_OVER = "rest_over"; private const val ID = 7; private const val ID_OVER = 8
@@ -42,11 +47,11 @@ object Rest {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** [sound]: ring when the rest is over, not only buzz. */
-    fun start(ctx: Context, secs: Int, sound: Boolean = true) {
+    /** [sound]: ring when the rest is over, not only buzz. [over]: keep counting past the end (#27). */
+    fun start(ctx: Context, secs: Int, sound: Boolean = true, over: Boolean = false) {
         if (secs <= 0) return
-        length = secs * 1000L; until = System.currentTimeMillis() + length
-        prefs(ctx).edit().putLong("until", until).putLong("length", length).putBoolean("sound", sound).apply()
+        length = secs * 1000L; until = System.currentTimeMillis() + length; ended = 0
+        prefs(ctx).edit().putLong("until", until).putLong("length", length).putBoolean("sound", sound).putBoolean("over", over).remove("ended").apply()
         NotificationManagerCompat.from(ctx).cancel(ID_OVER)
         schedule(ctx); notify(ctx)
     }
@@ -56,12 +61,13 @@ object Rest {
         prefs(ctx).edit().putLong("until", until).putLong("length", length).apply()
         schedule(ctx); notify(ctx)
     }
-    fun stop(ctx: Context) { until = 0; prefs(ctx).edit().remove("until").apply(); cancelAlarm(ctx); NotificationManagerCompat.from(ctx).apply { cancel(ID); cancel(ID_OVER) } }
+    fun stop(ctx: Context) { until = 0; ended = 0; prefs(ctx).edit().remove("until").remove("ended").apply(); cancelAlarm(ctx); NotificationManagerCompat.from(ctx).apply { cancel(ID); cancel(ID_OVER) } }
 
     /** After the process was restarted in the middle of a rest: the count-down goes on from where it was. */
     fun restore(ctx: Context) {
         val p = prefs(ctx); val u = p.getLong("until", 0)
         if (u > System.currentTimeMillis()) { until = u; length = p.getLong("length", 0) }
+        else p.getLong("ended", 0).takeIf { it > 0 }?.let { ended = it; length = p.getLong("length", 0) }
     }
 
     /** The app came to the screen: the «rest is over» notification has done its job. */
@@ -112,7 +118,9 @@ object Rest {
         val p = prefs(ctx)
         // the alarm of a rest already ended (or stopped) by the screen
         if (until == 0L && p.getLong("until", 0) == 0L) return
+        val end = until.takeIf { it > 0 } ?: p.getLong("until", 0)
         until = 0; p.edit().remove("until").apply()
+        if (p.getBoolean("over", false)) { ended = end; p.edit().putLong("ended", end).apply() }
         cancelAlarm(ctx)
         NotificationManagerCompat.from(ctx).cancel(ID)
         val v = ctx.getSystemService(Vibrator::class.java)
