@@ -6,6 +6,23 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.12.0] - 2026-11-24
+
+### Added
+- **Replace an exercise (#28):** in its menu – sets done stay, the rest move to the new one.
+- **A rest that keeps counting (#27):** an option – when the rest is over, the timer turns red and counts on until «Next set».
+- **Time by place (#26):** gym, home, outside and class under the time trained. Can be hidden.
+- **Days in the colour of their place (#24):** home blue, outside green, class violet.
+
+### Changed
+- **«In the gym» is now «training» (#25):** the time counts every workout, wherever it was.
+
+<!-- tg
+Упражнение можно заменить прямо на тренировке: «⋯» → «Заменить упражнение»
+Новая настройка «Считать отдых дальше»: после сигнала таймер краснеет и считает, сколько вы отдыхаете сверху
+Время тренировок теперь делится по местам – зал, дом, улица, группа (можно скрыть в настройках «Вид»), а календарь красит дни: дом синим, улицу зелёным, группу фиолетовым
+-->
+
 ## [1.11.0] - 2026-11-22
 
 ### Added
