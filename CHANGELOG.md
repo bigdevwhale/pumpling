@@ -6,6 +6,24 @@ line "<!-- tg", then 2-4 short lines in Russian for users (what is new, what is 
 then close it like any HTML comment. The release notes carry it, and the chat bot posts those lines.
 -->
 
+## [1.13.0] - 2026-11-26
+
+### Added
+- **Plan a workout for a day (#31):** it waits on the home screen that day, with the same exercises.
+- **Helping muscles for your own exercises (#36):** blue on the figure, half a set in the stats.
+
+### Changed
+- **Two dumbbells count twice in «lifted» (#34):** write one dumbbell's weight.
+- **No more «try 31 × 8» (#33):** you see how many workouts in a row the weight has stood.
+- **Stretches explained (#35):** what to write for each; group stretching is easier to find.
+- **Durations in hours and minutes (#31).**
+
+<!-- tg
+Тренировку можно запланировать на нужный день: в журнале откройте её → «Запланировать на день» – в этот день она будет ждать на главной с теми же упражнениями
+Тоннаж теперь учитывает обе гантели – пишите вес одной; в упражнениях одной рукой и в подходах «левая/правая» считается одна
+Вместо «попробуйте 31×8» – сколько тренировок подряд держится вес; у своих упражнений можно отметить вспомогательные мышцы, а у растяжек появились подсказки, что писать
+-->
+
 ## [1.12.0] - 2026-11-24
 
 ### Added
