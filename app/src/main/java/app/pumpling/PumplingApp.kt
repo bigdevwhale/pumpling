@@ -330,6 +330,11 @@ class AppContainer(context: Context) {
     }
 
     /** Starts [w] over: the same exercises in the same supersets, sets and weights as last time. */
+    /** Workout [workoutId] to do again on [day] (#31); plans for days gone by are dropped on the way. */
+    suspend fun plan(workoutId: Long, day: Long) = settings.update { s ->
+        s.copy(planned = (s.plans(today()).filter { it != day to workoutId } + (day to workoutId)).sortedBy { it.first }.map { "${it.first}:${it.second}" }) }
+    suspend fun unplan(day: Long, workoutId: Long) = settings.update { s -> s.copy(planned = s.planned - "$day:$workoutId") }
+
     suspend fun again(w: Workout): Long {
         val nid = start(null)
         dao.workout(nid)?.let { dao.update(it.copy(title = w.title)) }

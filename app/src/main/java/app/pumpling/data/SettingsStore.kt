@@ -49,7 +49,12 @@ data class Settings(
     val achieved: Set<String> = emptySet(),     // achievement tiers paid: «workouts:2»
     val restOver: Boolean = false,              // an ended rest keeps counting, in red, until the next set (#27)
     val placeTimes: Boolean = true,             // time by place under the time trained (#26); off for those it presses on
+    val planned: List<String> = emptyList(),    // workouts to do again on a day (#31): «epochDay:workoutId», by day
 ) {
+    /** The plans as (day, workout id), from today on. */
+    fun plans(from: Long): List<Pair<Long, Long>> = planned.mapNotNull { p -> p.split(':').takeIf { it.size == 2 }?.let { (d, w) -> d.toLongOrNull()?.let { dd -> w.toLongOrNull()?.let { dd to it } } } }
+        .filter { it.first >= from }.sortedBy { it.first }
+
     fun json(): JSONObject = JSONObject().apply {
         put("onboarded", onboarded); put("plates", plates); put("items", JSONArray(items.toList())); put("hidden", JSONArray(hidden.toList()))
         put("weekGoal", weekGoal); put("lb", lb); put("theme", theme); put("bodyweight", bodyweight); put("sex", sex); put("digested", digested)
@@ -58,7 +63,7 @@ data class Settings(
         put("yearGoal", yearGoal); put("bar", bar); put("plateSet", plateSet); put("cardBg", cardBg); put("hideWeights", hideWeights)
         put("town", town); if (!lat.isNaN()) { put("lat", lat); put("lon", lon) }; put("guessed", guessed); put("outside", outside); put("gear", JSONArray(gear)); put("goals", JSONArray(goals.toList())); put("checkIn", checkIn)
         put("weather", weather); put("remindDays", JSONArray(remindDays.toList())); put("remindAt", remindAt); put("health", health); put("achieved", JSONArray(achieved.toList()))
-        put("restOver", restOver); put("placeTimes", placeTimes)
+        put("restOver", restOver); put("placeTimes", placeTimes); put("planned", JSONArray(planned))
     }
 
     companion object {
@@ -73,7 +78,7 @@ data class Settings(
                 j.optString("town"), j.optDouble("lat", Double.NaN), j.optDouble("lon", Double.NaN), j.optBoolean("guessed"), j.optString("outside"), list("gear"), set("goals"), j.optInt("checkIn"),
                 j.optBoolean("weather", true), (j.optJSONArray("remindDays")?.let { a -> (0 until a.length()).map { a.getInt(it) } } ?: emptyList()).toSet(),
                 j.optInt("remindAt", 18 * 60), j.optBoolean("health"), set("achieved"),
-                j.optBoolean("restOver"), j.optBoolean("placeTimes", true))
+                j.optBoolean("restOver"), j.optBoolean("placeTimes", true), list("planned"))
         }
     }
 }

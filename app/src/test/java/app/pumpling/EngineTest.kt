@@ -182,4 +182,39 @@ class EngineTest {
         assertEquals(app.pumpling.domain.Place.STREET, app.pumpling.domain.Place.of("street"))
         assertEquals(null, app.pumpling.domain.Place.of(""))
     }
+
+    /** Two dumbbells lift twice the weight written; one dumbbell, or a left or right set, once (#34). */
+    @Test fun dumbbellPairsCountTwice() {
+        val t = app.pumpling.domain.Tonnage
+        assertEquals(400.0, t.of(set(1, 1, "db_bench", 20.0, 10), 80.0), 1e-6)
+        assertEquals(200.0, t.of(set(2, 1, "db_row", 20.0, 10), 80.0), 1e-6)
+        assertEquals(200.0, t.of(set(3, 1, "db_curl", 20.0, 10).copy(side = 1), 80.0), 1e-6)
+        assertEquals(1000.0, t.of(set(4, 1, "squat", 100.0, 10), 80.0), 1e-6)
+        assertTrue(t.ONE_DB.all { Catalog.of(it).equip == app.pumpling.domain.Equip.DB })
+    }
+
+    /** Stretching in motion is written in reps but lifts nothing (#35); a class logged at a group counts as a class (#29). */
+    @Test fun stretchesAndClasses() {
+        assertEquals(0.0, app.pumpling.domain.Tonnage.of(set(1, 1, "worlds_greatest", 0.0, 60), 80.0), 1e-6)
+        assertTrue(Catalog.all().filter { it.matches("растяжка") }.any { it.id == "stretching_class" })
+        val ws = listOf(Workout(1, 0, 600_000, place = P.GROUP.code), Workout(2, 0, 600_000, classOf = "pilates"), Workout(3, 0, 600_000, place = P.HOME.code))
+        val d = app.pumpling.domain.AchData(app.pumpling.domain.Tally(ws, emptyList(), Settings()), emptyList(), Settings(), 0)
+        assertEquals(2.0, app.pumpling.domain.Achievements.byId.getValue("classes").value(d), 1e-9)
+    }
+
+    /** How many workouts in a row the heaviest set stayed the same (#33). */
+    @Test fun plateau() {
+        val p = app.pumpling.domain.Plateau
+        val h = listOf(listOf(set(1, 3, "lat_pulldown", 30.0, 8), set(2, 3, "lat_pulldown", 30.0, 7)), listOf(set(3, 2, "lat_pulldown", 30.0, 8)),
+            listOf(set(4, 1, "lat_pulldown", 27.5, 8)))
+        assertEquals(30.0 to 2, p.of(h)!!.let { it.first.weight to it.second })
+        assertEquals(1, p.of(listOf(listOf(set(5, 4, "lat_pulldown", 32.5, 8))) + h)!!.second)
+        assertEquals(null, p.of(emptyList()))
+    }
+
+    /** Plans for a day: by day, days gone by and broken ones left out (#31). */
+    @Test fun plannedDays() {
+        val s = Settings(planned = listOf("${today() - 1}:4", "${today() + 2}:7", "${today()}:5", "junk"))
+        assertEquals(listOf(today() to 5L, today() + 2 to 7L), s.plans(today()))
+    }
 }

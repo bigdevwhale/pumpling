@@ -130,6 +130,8 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
     var name by remember { mutableStateOf(old?.name ?: nav.draftName.also { nav.draftName = "" }) }
     var kind by remember { mutableStateOf(Kind.of(old?.kind?.firstOrNull() ?: 'W')) }
     val prim = remember { mutableStateListOf<Muscle>().apply { addAll(old?.primary?.split(',')?.mapNotNull { Muscle.of(it) } ?: emptyList()) } }
+    // helping muscles (#36): blue on the figure, and half a set each in the stats
+    val sec = remember { mutableStateListOf<Muscle>().apply { addAll(old?.secondary?.split(',')?.mapNotNull { Muscle.of(it) }?.filter { it !in prim } ?: emptyList()) } }
     var equip by remember { mutableStateOf(old?.equip ?: "other") }
     var addGear by remember { mutableStateOf(false) }
     var cat by remember { mutableStateOf(old?.cat?.let { Cat.of(it) }) }
@@ -165,9 +167,12 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
         }
         Section(icon = Icons.ARM, text = tr("Какие мышцы работают", "Muscles worked"))
         Column(Modifier.fillMaxWidth().card(18.dp).padding(14.dp)) {
-            app.pumpling.ui.components.TargetMap(prim.toList(), emptyList(), h = 150.dp, legend = false)
-            FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Muscle.entries.forEach { m -> Chip(m.label, m in prim, color = col) { if (m in prim) prim.remove(m) else prim.add(m) } } }
+            app.pumpling.ui.components.TargetMap(prim.toList(), sec.toList(), h = 150.dp)
+            Text(tr("Нажмите на мышцу раз – основная, ещё раз – помогает (считается за полподхода), третий – убрать.",
+                "Tap a muscle once – main, again – helping (counts as half a set), a third time – off."), style = T.small, modifier = Modifier.padding(top = 10.dp))
+            FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Muscle.entries.forEach { m -> Chip(m.label, m in prim || m in sec, color = if (m in sec) app.pumpling.ui.components.SECONDARY else app.pumpling.ui.components.PRIMARY) {
+                    when (m) { in prim -> { prim.remove(m); sec.add(m) }; in sec -> sec.remove(m); else -> prim.add(m) } } } }
         }
         Section(icon = Icons.GYM, text = tr("Инвентарь", "Equipment"))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -184,7 +189,7 @@ fun OwnExPage(id: Long, d: Data, nav: Nav) {
             style = T.small, modifier = Modifier.padding(top = 8.dp))
         Spacer(Modifier.height(20.dp))
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), enabled = name.isNotBlank()) {
-            c.write { val exId = saveOwn(OwnEx(id = old?.id ?: 0, name = name.trim(), kind = kind.code.toString(), primary = prim.joinToString(",") { it.id }, equip = equip, cat = auto.id))
+            c.write { val exId = saveOwn(OwnEx(id = old?.id ?: 0, name = name.trim(), kind = kind.code.toString(), primary = prim.joinToString(",") { it.id }, secondary = sec.joinToString(",") { it.id }, equip = equip, cat = auto.id))
                 say(tr("Упражнение сохранено", "Exercise saved"))
                 // made from the picker of a workout: it goes straight into that workout
                 val into = when (val top = nav.stack.lastOrNull { it is Screen.Live || it is Screen.Edit }) { is Screen.Edit -> top.id; Screen.Live -> d.live?.id; else -> null }

@@ -69,10 +69,10 @@ fun TimePick(mins: Int, modifier: Modifier = Modifier, onPick: (Int) -> Unit) {
     }
 }
 
-/** A day up to today: tapping it opens a calendar (#12). [day] is an epoch day. */
+/** A day up to today – or, with [future], from today on (#31): tapping it opens a calendar (#12). [day] is an epoch day. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DayPick(day: Long, modifier: Modifier = Modifier, onPick: (Long) -> Unit) {
+fun DayPick(day: Long, modifier: Modifier = Modifier, future: Boolean = false, onPick: (Long) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box(modifier.clip(RoundedCornerShape(14.dp)).background(C.card2).clickable { open = true }.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
         Text(fmtDayYear(day), style = T.bodyB)
@@ -81,8 +81,8 @@ fun DayPick(day: Long, modifier: Modifier = Modifier, onPick: (Long) -> Unit) {
         val dayMs = 86_400_000L
         val last = (today() + 1) * dayMs
         val st = rememberDatePickerState(initialSelectedDateMillis = day * dayMs, selectableDates = object : SelectableDates {
-            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis < last
-            override fun isSelectableYear(year: Int) = year <= java.time.LocalDate.ofEpochDay(today()).year
+            override fun isSelectableDate(utcTimeMillis: Long) = if (future) utcTimeMillis >= today() * dayMs else utcTimeMillis < last
+            override fun isSelectableYear(year: Int) = if (future) year >= java.time.LocalDate.ofEpochDay(today()).year else year <= java.time.LocalDate.ofEpochDay(today()).year
         })
         val colors = androidx.compose.material3.DatePickerDefaults.colors(containerColor = C.bg, titleContentColor = C.mute, headlineContentColor = C.ink,
             weekdayContentColor = C.mute, navigationContentColor = C.ink, dayContentColor = C.ink, disabledDayContentColor = C.mute.copy(alpha = .5f),
@@ -96,18 +96,21 @@ fun DayPick(day: Long, modifier: Modifier = Modifier, onPick: (Long) -> Unit) {
     }
 }
 
-/** How long it took: quick choices and a field for any other number of minutes (#12). */
+/** How long it took: quick choices and fields for any other time, in hours and minutes (#12, #31). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MinutesPick(mins: Int, choices: List<Int> = listOf(15, 30, 45, 60, 90), onChange: (Int) -> Unit) {
-    var text by remember { mutableStateOf("$mins") }
+    var h by remember { mutableStateOf(if (mins >= 60) "${mins / 60}" else "") }
+    var m by remember { mutableStateOf("${mins % 60}") }
+    fun send() { val t = (h.toIntOrNull() ?: 0) * 60 + (m.toIntOrNull() ?: 0); if (t in 1..720) onChange(t) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-        choices.forEach { m -> Chip("$m", mins == m) { text = "$m"; onChange(m) } }
+        choices.forEach { c -> Chip(app.pumpling.domain.span(c * 60_000L).replace(" 00 мин", "").replace(" 00 min", ""), mins == c) {
+            h = if (c >= 60) "${c / 60}" else ""; m = "${c % 60}"; onChange(c) } }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Field(text, { t -> text = t.filter { it.isDigit() }.take(3); text.toIntOrNull()?.takeIf { it in 1..720 }?.let(onChange) },
-                tr("своё", "other"), Modifier.width(76.dp), number = true, center = true)
-            Spacer(Modifier.width(6.dp))
-            Text(tr("мин", "min"), style = T.small)
+            Field(h, { t -> h = t.filter { it.isDigit() }.take(2); send() }, "0", Modifier.width(52.dp), number = true, center = true)
+            Text(" " + tr("ч", "h") + "  ", style = T.small)
+            Field(m, { t -> m = t.filter { it.isDigit() }.take(3); send() }, "0", Modifier.width(60.dp), number = true, center = true)
+            Text(" " + tr("мин", "min"), style = T.small)
         }
     }
     Spacer(Modifier.height(2.dp))

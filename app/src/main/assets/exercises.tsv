@@ -271,7 +271,7 @@ hamstring_stretch	Растяжка бицепса бедра	Hamstring stretch	T
 shoulder_dislocate	Выкруты с палкой	Shoulder dislocates	B	delts		other	flex	выкрут, гимнастическая палка
 worlds_greatest	Величайшая растяжка в мире	World's greatest stretch	B	hams,glutes	delts	bw	flex	
 child_pose	Поза ребёнка	Child's pose	T	lower	lats	bw	flex	
-stretching_class	Стретчинг-класс	Stretching class	M	hams	glutes	bw	flex	
+stretching_class	Групповая растяжка	Stretching class	M	hams	glutes	bw	flex	растяжка, стретчинг, стретчинг-класс
 single_leg_stand	Стойка на одной ноге	Single-leg stand	T	calves	abs	bw	bal	баланс на одной ноге
 balance_board	Баланс-борд	Balance board	M	calves	abs	other	bal	
 warrior3	Поза воина III	Warrior III	T	glutes,hams	abs	bw	bal	

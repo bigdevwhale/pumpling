@@ -133,7 +133,7 @@ object Engine {
             Bite(x, ex.cat, f * m, x.rpe >= 9)
         }
         var total = bites.sumOf { it.food }
-        val tonnage = work.filter { !it.warmup }.sumOf { x -> val ex = Catalog.of(x.exId); if (ex.kind == Kind.WEIGHT) x.weight * x.reps else 0.0 }
+        val tonnage = work.filter { !it.warmup && Catalog.of(it.exId).kind == Kind.WEIGHT }.sumOf { Tonnage.of(it, bw) }
         if ("mammoth" in species && tonnage >= 500) { total += tonnage / 500; bonus += tr("Мамонт: ${tonnage(tonnage)}, +${(tonnage / 500).toInt()}", "Mammoth: ${tonnage(tonnage)}, +${(tonnage / 500).toInt()}") }
         val byCat = bites.groupBy { it.cat }.mapValues { e -> e.value.sumOf { it.food } }
 

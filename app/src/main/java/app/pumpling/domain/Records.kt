@@ -122,3 +122,16 @@ fun setLine(ex: Ex, s: WSet): String = sideMark(s.side).let { if (it.isEmpty()) 
     Kind.CARDIO -> listOfNotNull(s.meters.takeIf { it > 0 }?.let { km(it) }, clock(s.secs)).joinToString(" · ")
     Kind.MINUTES -> dur(s.secs)
 }
+
+/**
+ * How long an exercise has stood still (#33): its heaviest working set in each of the last workouts,
+ * newest first, and how many of them in a row matched the newest one – weight and reps both.
+ */
+object Plateau {
+    /** [history]: the exercise's done sets, one list per workout, newest workout first. Null with nothing weighed. */
+    fun of(history: List<List<WSet>>): Pair<WSet, Int>? {
+        val tops = history.map { l -> l.filter { !it.warmup && it.weight > 0 && it.reps > 0 }.maxWithOrNull(compareBy<WSet>({ it.weight }, { it.reps })) }
+        val top = tops.firstOrNull() ?: return null
+        return top to tops.takeWhile { it != null && kotlin.math.abs(it.weight - top.weight) < .01 && it.reps == top.reps }.size
+    }
+}

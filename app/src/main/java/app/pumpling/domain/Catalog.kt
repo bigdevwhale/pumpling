@@ -22,9 +22,13 @@ enum class Kind(val code: Char) {
     fun help(ex: Ex? = null): String {
         val n = ex?.name?.let { "«$it»" }
         return when (this) {
-            WEIGHT -> tr("Пишете вес снаряда и сколько раз подняли: ${n ?: "жим"} 60 кг × 8. Для штанги, гантелей, гирь и тренажёров.",
+            WEIGHT -> if (ex != null && Tonnage.pair(ex)) tr("Пишете вес одной гантели и сколько раз подняли: $n 12 кг × 10. В «поднято» посчитаются обе гантели. Если делаете по одной руке – разделите подходы на левую и правую в меню «⋯».",
+                    "Write one dumbbell's weight and how many times you lifted it: $n 12 kg × 10. «Lifted» counts both dumbbells. One arm at a time? Split the sets into left and right in the «⋯» menu.")
+                else tr("Пишете вес снаряда и сколько раз подняли: ${n ?: "жим"} 60 кг × 8. Для штанги, гантелей, гирь и тренажёров.",
                 "Write the weight and how many times you lifted it: ${n ?: "a press"} 60 kg × 8. For barbells, dumbbells, kettlebells and machines.")
-            BODY -> tr("Только повторы: ${n ?: "отжимания"} × 10. Поле веса оставьте пустым. Если добавляете груз (блин на поясе, жилет) – впишите его вес, он прибавится к вашему.",
+            BODY -> if (ex?.cat == Cat.FLEX) tr("Это растяжка в движении: пишите, сколько раз повторили, на каждую сторону – $n × 5. Не секунды: растяжки на время – это позы вроде «Поза голубя» или «Растяжка бицепса бедра», там поле в секундах. Вес оставьте пустым.",
+                    "This is a stretch in motion: write how many times you did it, each side – $n × 5. Not seconds: timed stretches are poses like «Pigeon pose» or «Hamstring stretch», which take seconds. Leave the weight empty.")
+                else tr("Только повторы: ${n ?: "отжимания"} × 10. Поле веса оставьте пустым. Если добавляете груз (блин на поясе, жилет) – впишите его вес, он прибавится к вашему.",
                 "Just the reps: ${n ?: "push-ups"} × 10. Leave the weight empty. With an added load (a plate on a belt, a vest), write its weight – it adds to yours.")
             ASSIST -> tr("Гравитрон или резинка помогают. Пишете, сколько килограммов помощи выставили, и повторы: ${n ?: "подтягивания"}, помощь 20 кг × 8. Чем меньше помощь, тем вы сильнее – когда она уменьшится, будет рекорд.",
                 "An assisted machine or band helps you. Write how many kilos of help you set and the reps: ${n ?: "pull-ups"}, help 20 kg × 8. Less help means stronger – when it drops, that's a record.")
@@ -32,7 +36,9 @@ enum class Kind(val code: Char) {
                 "How many seconds you held: ${n ?: "a plank"}, 60 s. If you hold a load, add the weight too.")
             CARDIO -> tr("Километры и минуты: ${n ?: "бег"} 5 км за 30 мин. Темп и лучшее время посчитаются сами. Если дистанции нет – только минуты.",
                 "Kilometres and minutes: ${n ?: "a run"}, 5 km in 30 min. Pace and best times are worked out for you. No distance? Just minutes.")
-            MINUTES -> tr("Только время: ${n ?: "йога"} 30 мин. Подходит для занятий, где подходов нет.",
+            MINUTES -> if (ex?.cat == Cat.FLEX) tr("Всё занятие целиком, в минутах: $n 15 мин. Отдельные позы на время – «Поза голубя», «Растяжка бицепса бедра» – это свои упражнения, в секундах.",
+                    "The whole session, in minutes: $n, 15 min. Single timed poses – «Pigeon pose», «Hamstring stretch» – are exercises of their own, in seconds.")
+                else tr("Только время: ${n ?: "йога"} 30 мин. Подходит для занятий, где подходов нет.",
                 "Just the time: ${n ?: "yoga"}, 30 min. For activities without sets.")
         }
     }

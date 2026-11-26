@@ -19,14 +19,24 @@ class Week(val workouts: List<Workout>, val sets: List<WSet>, val beforeSets: Li
     fun catSets(c: Cat) = work.count { Catalog.of(it.exId).cat == c }.toDouble()
 }
 
-/** Kilograms moved in a set: weight × reps; with your own weight, 70% of it plus what's added (or minus the assist). */
+/**
+ * Kilograms moved in a set: weight × reps; with your own weight, 70% of it plus what's added (or minus the assist).
+ * The weight of a dumbbell exercise is one dumbbell's: done with two, both count (#34). Stretching in motion lifts nothing (#35).
+ */
 object Tonnage {
-    fun of(x: WSet, bw: Double): Double = when (Catalog.of(x.exId).kind) {
-        Kind.WEIGHT -> x.weight * x.reps
-        Kind.BODY -> (bw * .7 + x.weight) * x.reps
-        Kind.ASSIST -> kotlin.math.max(0.0, bw * .7 - x.weight) * x.reps
-        else -> 0.0
-    }
+    /** Dumbbell exercises done with one dumbbell: its weight counts once. */
+    val ONE_DB = setOf("db_row", "pullover", "oh_ext", "concentration_curl", "tri_kickback", "single_leg_rdl", "db_snatch")
+    /** Is [ex] done with a dumbbell in each hand, so the weight written is one of two? */
+    fun pair(ex: Ex) = ex.kind == Kind.WEIGHT && ex.equip == Equip.DB && ex.id !in ONE_DB
+    /** How many times the weight of set [x] is lifted at once: twice for a pair of dumbbells, once for a left or a right set. */
+    fun hands(ex: Ex, x: WSet) = if (pair(ex) && x.side == 0) 2 else 1
+    fun of(x: WSet, bw: Double): Double { val ex = Catalog.of(x.exId)
+        return when (ex.kind) {
+            Kind.WEIGHT -> x.weight * x.reps * hands(ex, x)
+            Kind.BODY -> if (ex.cat == Cat.FLEX) 0.0 else (bw * .7 + x.weight) * x.reps
+            Kind.ASSIST -> kotlin.math.max(0.0, bw * .7 - x.weight) * x.reps
+            else -> 0.0
+        } }
 }
 
 object Quests {

@@ -78,8 +78,8 @@ object Achievements {
             listOf(1.0, 10.0, 30.0)) { it.t.early.toDouble() },
         Achievement("late", "Сова", "Night owl", "Тренировки после 21:00", "Workouts after 9 pm",
             listOf(1.0, 10.0, 30.0)) { it.t.late.toDouble() },
-        Achievement("classes", "Групповые занятия", "Group classes", "Пилатес, йога, круговые и другие занятия с таймером", "Pilates, yoga, circuits and other classes with a timer",
-            listOf(1.0, 10.0, 30.0)) { d -> d.t.workouts.count { it.classOf.isNotEmpty() }.toDouble() },
+        Achievement("classes", "Групповые занятия", "Group classes", "Пилатес, йога, растяжка и другие занятия в группе", "Pilates, yoga, stretching and other classes in a group",
+            listOf(1.0, 10.0, 30.0)) { d -> d.t.workouts.count { it.classOf.isNotEmpty() || it.place == Place.GROUP.code }.toDouble() },   // logged in one go at a class counts too (#29)
         Achievement("supersets", "Суперсеты", "Supersets", "Тренировки, где упражнения шли суперсетом", "Workouts with exercises done as a superset",
             listOf(1.0, 10.0, 30.0)) { d -> d.t.work.filter { it.superset > 0 }.map { it.workoutId }.distinct().size.toDouble() },
         Achievement("pets", "Питомцы", "Pets", "Сколько питомцев вылупилось", "Pets hatched",

@@ -255,6 +255,7 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
     val st = remember(d.workouts, d.sets) { Stats(d.workouts, d.sets, d.bodies, d.s, Span.of(Span.ALL)) }
     val sets = d.setsBy[w.id].orEmpty().filter { it.done }
     var askDelete by remember { mutableStateOf(false) }
+    var askPlan by remember { mutableStateOf(false) }
     Page(w.title.ifEmpty { tr("Тренировка", "Workout") }, { nav.pop() }, action = {
         Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.push(Screen.Edit(w.id)) }, contentAlignment = Alignment.Center) { Icon(Icons.EDIT, C.ink, 22.dp) }
         Box(Modifier.size(44.dp).clip(CircleShape).clickable { nav.share = ShareReq(CardKind.WORKOUT, w.id) }, contentAlignment = Alignment.Center) { Icon(Icons.SHARE, C.ink, 22.dp) } }) {
@@ -346,6 +347,8 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
             else c.write { again(w) }
             nav.pop(); nav.push(Screen.Live) }
         Spacer(Modifier.height(8.dp))
+        Ghost(tr("Запланировать на день", "Plan it for a day"), Modifier.fillMaxWidth()) { askPlan = true }
+        Spacer(Modifier.height(8.dp))
         Ghost(tr("Изменить тренировку", "Edit the workout"), Modifier.fillMaxWidth()) { nav.push(Screen.Edit(w.id)) }
         Spacer(Modifier.height(8.dp))
         if (w.classOf.isEmpty()) Ghost(tr("Сохранить как программу", "Save as a routine"), Modifier.fillMaxWidth()) {
@@ -354,10 +357,37 @@ fun WorkoutPage(id: Long, d: Data, nav: Nav) {
         Spacer(Modifier.height(8.dp))
         Ghost(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { askDelete = true }
     }
+    if (askPlan) PlanPopup(w, d) { askPlan = false }
     if (askDelete) app.pumpling.ui.components.Popup({ askDelete = false }) {
         Text(tr("Удалить тренировку?", "Delete this workout?"), style = T.h2)
         Text(tr("Подходы и рекорды из неё пропадут. Съеденное питомцами останется.", "Its sets and records go. What the pets ate stays."), style = T.body, modifier = Modifier.padding(vertical = 10.dp))
         Btn(tr("Удалить", "Delete"), Modifier.fillMaxWidth(), color = C.bad) { c.write { deleteWorkout(w.id) }; askDelete = false; nav.pop() }
+    }
+}
+
+/** The same workout on another day (#31): it waits on the home screen that day, ready to start with these exercises. */
+@Composable
+private fun PlanPopup(w: app.pumpling.data.Workout, d: Data, onClose: () -> Unit) {
+    val c = LocalContext.current.container
+    var day by remember { androidx.compose.runtime.mutableLongStateOf(today() + 1) }
+    app.pumpling.ui.components.Popup(onClose) {
+        Text(tr("Запланировать на день", "Plan it for a day"), style = T.h2)
+        Text(tr("В этот день тренировка будет ждать на главной – с теми же упражнениями, веса подставятся из прошлого раза.",
+            "That day it waits on the home screen – the same exercises, the weights from last time."), style = T.body, modifier = Modifier.padding(top = 8.dp, bottom = 12.dp))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(tr("сегодня", "today"), day == today()) { day = today() }
+            Chip(tr("завтра", "tomorrow"), day == today() + 1) { day = today() + 1 }
+            Chip(tr("послезавтра", "in two days"), day == today() + 2) { day = today() + 2 }
+            Chip(tr("через неделю", "in a week"), day == dayOf(w.start) + 7 && day >= today()) { day = maxOf(today(), dayOf(w.start) + 7) }
+            app.pumpling.ui.components.DayPick(day, future = true) { day = it }
+        }
+        if (d.s.plans(today()).any { it == day to w.id }) Text(tr("Уже запланирована на этот день", "Already planned for that day"), style = T.small, modifier = Modifier.padding(top = 8.dp))
+        Spacer(Modifier.height(14.dp))
+        Btn(tr("Запланировать", "Plan it"), Modifier.fillMaxWidth(), color = C.ok) {
+            val dd = day; onClose()
+            val on = when (dd) { today() -> tr("сегодня", "today"); today() + 1 -> tr("завтра", "tomorrow"); else -> fmtDayYear(dd) }
+            c.write { plan(w.id, dd); say(tr("Запланировано: ", "Planned: ") + on) }
+        }
     }
 }
 

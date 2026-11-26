@@ -54,6 +54,7 @@ import app.pumpling.domain.clock
 import app.pumpling.domain.fmt2
 import app.pumpling.domain.setLine
 import app.pumpling.domain.toKg
+import app.pumpling.domain.count
 import app.pumpling.domain.tr
 import app.pumpling.domain.unit
 import app.pumpling.domain.w
@@ -289,16 +290,21 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
             Box(Modifier.size(36.dp).clip(CircleShape).clickable(onClick = onMenu), contentAlignment = Alignment.Center) { Icon(Icons.DOTS, C.mute, 20.dp) }
         }
         val ghost = last.filter { !it.warmup }
-        if (!live) Unit else if (ghost.isNotEmpty()) Text(tr("В прошлый раз: ", "Last time: ") + ghost.joinToString(", ") { setLine(ex, it) } + hint(ex, ghost), style = T.small, modifier = Modifier.padding(top = 2.dp))
+        val still = remember(d.doneSets, ex.id) { if (ex.kind != Kind.WEIGHT) null else stillFor(ex.id, d) }
+        if (!live) Unit else if (ghost.isNotEmpty()) Text(tr("В прошлый раз: ", "Last time: ") + ghost.joinToString(", ") { setLine(ex, it) } + hint(still, ghost.size > 1), style = T.small, modifier = Modifier.padding(top = 2.dp))
         else Text(tr("Первый раз – рекордом будет следующий", "First time – the next one can be a record"), style = T.small, modifier = Modifier.padding(top = 2.dp))
-        if (ex.kind == Kind.ASSIST || ex.kind == Kind.BODY || ex.kind == Kind.HOLD) {
+        val pair = app.pumpling.domain.Tonnage.pair(ex); val flex = ex.cat == app.pumpling.domain.Cat.FLEX
+        if (ex.kind == Kind.ASSIST || ex.kind == Kind.BODY || ex.kind == Kind.HOLD || pair || (flex && ex.kind == Kind.MINUTES)) {
             var more by remember { mutableStateOf(false) }
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.card2).clickable { more = !more }.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.Top) {
                 Text("?", style = T.smallB.copy(color = C.acc), modifier = Modifier.padding(end = 8.dp))
                 Text(if (more) ex.kind.help(ex) else when (ex.kind) {
                     Kind.ASSIST -> tr("Пишите вес помощи гравитрона: меньше помощь – сильнее вы", "Write the machine's help: less help – stronger you")
-                    Kind.BODY -> tr("Вес – только если добавляете груз на пояс", "Weight only if you add a load on a belt")
+                    Kind.BODY -> if (flex) tr("Растяжка в движении: повторы на сторону, не секунды", "A stretch in motion: reps each side, not seconds")
+                        else tr("Вес – только если добавляете груз на пояс", "Weight only if you add a load on a belt")
+                    Kind.WEIGHT -> tr("Вес одной гантели – в «поднято» посчитаются обе", "One dumbbell's weight – «lifted» counts both")
+                    Kind.MINUTES -> tr("Всё занятие в минутах; позы на время – отдельно, в секундах", "The whole session in minutes; timed poses go separately, in seconds")
                     else -> tr("Время удержания в секундах", "Hold time in seconds") } + if (more) "" else tr("  ·  подробнее", "  ·  more"), style = T.tiny.copy(color = C.ink))
             }
         }
@@ -317,13 +323,20 @@ private fun Block(wid: Long, b: Int, ex: Ex, list: List<WSet>, last: List<WSet>,
     }
 }
 
-/** A nudge for progressive overload after the ghost: «→ 62,5 × 8». */
-private fun hint(ex: Ex, ghost: List<WSet>): String {
-    if (ex.kind != Kind.WEIGHT) return ""
-    val top = ghost.maxBy { it.weight }; if (top.weight <= 0 || top.reps <= 0) return ""
-    val allHit = ghost.all { it.reps >= top.reps }
-    return if (allHit && top.reps >= 10) tr("  → попробуйте ${w(top.weight + 2.5)}\u00a0×\u00a0${top.reps - 2}", "  → try ${w(top.weight + 2.5)}\u00a0×\u00a0${top.reps - 2}")
-    else tr("  → попробуйте ${w(top.weight)}\u00a0×\u00a0${top.reps + 1}", "  → try ${w(top.weight)}\u00a0×\u00a0${top.reps + 1}")
+/** The exercise's heaviest set and how many workouts in a row it has been that (#33). */
+private fun stillFor(exId: String, d: Data): Pair<WSet, Int>? {
+    val start = d.finished.associate { it.id to it.start }
+    return app.pumpling.domain.Plateau.of(d.doneSets.filter { it.exId == exId }.groupBy { it.workoutId }.entries.sortedByDescending { start[it.key] ?: 0L }.map { it.value })
+}
+
+/**
+ * After the ghost, how long the weight has stood (#33): «· 30 × 8 – 3 тренировки подряд». No «try 31 × 8»:
+ * a machine's stack or a pair of dumbbells doesn't go up by a kilo, and the nudge came every single time.
+ */
+private fun hint(still: Pair<WSet, Int>?, several: Boolean): String {
+    val (top, n) = still ?: return ""; if (n < 2) return ""
+    val what = if (several) "${w(top.weight)} × ${top.reps}" else tr("так", "the same")
+    return "  ·  $what " + tr("уже ", "for ") + count(n, "тренировка", "тренировки", "тренировок", "workout", "workouts") + tr(" подряд", " in a row")
 }
 
 private fun heads(ex: Ex) = when (ex.kind) {
@@ -454,7 +467,7 @@ private fun FinishSheet(d: Data, nav: Nav, onClose: () -> Unit) {
         Text(tr("Где?", "Where?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
         app.pumpling.ui.components.PlacePick(place) { place = it }
         if (w.manual) {
-            Text(tr("Сколько длилась, минут?", "How long was it, minutes?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+            Text(tr("Сколько длилась?", "How long was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
             app.pumpling.ui.components.MinutesPick(mins) { mins = it }
         }
         Spacer(Modifier.height(16.dp))
@@ -500,7 +513,7 @@ private fun EditSheet(w: app.pumpling.data.Workout, d: Data, nav: Nav, onClose: 
             app.pumpling.ui.components.DayPick(day) { day = it }
             app.pumpling.ui.components.TimePick(mins0) { mins0 = it }
         }
-        Text(tr("Сколько длилась, минут?", "How long was it, minutes?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Text(tr("Сколько длилась?", "How long was it?"), style = T.bodyB, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
         app.pumpling.ui.components.MinutesPick(mins) { mins = it }
         Spacer(Modifier.height(16.dp))
         Btn(tr("Сохранить", "Save"), Modifier.fillMaxWidth(), color = C.ok) {

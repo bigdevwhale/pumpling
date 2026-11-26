@@ -44,7 +44,9 @@ import app.pumpling.domain.Stats
 import app.pumpling.domain.Weeks
 import app.pumpling.domain.count
 import app.pumpling.domain.dayOf
+import app.pumpling.domain.fmtDay
 import app.pumpling.domain.fmtDayShort
+import app.pumpling.domain.weekday
 import app.pumpling.domain.fmt
 import app.pumpling.domain.fmt1
 import app.pumpling.domain.relDay
@@ -100,6 +102,7 @@ fun HomeScreen(d: Data, nav: Nav) {
                 contentAlignment = Alignment.Center) { Icon(Icons.SHARE, Color.White, 19.dp) }
         }
         Column(Modifier.padding(horizontal = 16.dp)) {
+            PlannedCard(d, nav)
             TodayCard(d, nav)
             StatusCard(d, nav)
             CheckInCard(d, nav)
@@ -280,9 +283,41 @@ private fun Say(d: Data) {
 }
 
 /** The routine next in line, with its exercises as pictures and one button; hidden once today is done. */
+/**
+ * Workouts planned for a day (#31): today's with a button to start it with the same exercises, the next ones
+ * below with their day. A cross takes a plan off; a plan whose workout was deleted isn't shown.
+ */
+@Composable
+private fun PlannedCard(d: Data, nav: Nav) {
+    if (d.live != null) return
+    val c = LocalContext.current.container
+    val plans = d.s.plans(today()).mapNotNull { (day, id) -> d.finished.firstOrNull { it.id == id }?.let { Triple(day, id, it) } }.take(3)
+    if (plans.isEmpty()) return
+    Column(Modifier.padding(bottom = 10.dp).fillMaxWidth().card(20.dp).padding(14.dp)) {
+        Text(tr("Запланировано", "Planned"), style = T.sec.copy(color = C.ok))
+        plans.forEach { (day, id, w) ->
+            val ex = remember(d.sets, id) { d.setsBy[id].orEmpty().filter { it.done }.map { it.exId }.distinct() }
+            val isToday = day == today()
+            Row(Modifier.padding(top = 8.dp).fillMaxWidth().clickable { nav.push(Screen.WorkoutView(id)) }, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (isToday) tr("Сегодня", "Today") else if (day == today() + 1) tr("Завтра", "Tomorrow") else "${weekday(day).replaceFirstChar { it.uppercase() }}, ${fmtDay(day)}", style = T.smallB.copy(color = if (isToday) C.ok else C.mute))
+                    Text(w.title.ifEmpty { tr("Тренировка", "Workout") }, style = if (isToday) T.h3 else T.bodyB, maxLines = 1)
+                    if (isToday) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ex.take(6).forEach { app.pumpling.ui.art.ExThumb(Catalog.of(it), 36.dp) }
+                        if (ex.size > 6) Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(C.card2), contentAlignment = Alignment.Center) { Text("+${ex.size - 6}", style = T.smallB) } }
+                }
+                Box(Modifier.size(36.dp).clip(CircleShape).clickable { c.write { unplan(day, id) } }, contentAlignment = Alignment.Center) { Icon(Icons.CLOSE, C.mute, 18.dp) }
+                if (isToday) Box(Modifier.padding(start = 4.dp).size(50.dp).clip(CircleShape).background(C.ok).clickable {
+                    c.write { unplan(day, id); if (w.classOf.isNotEmpty()) startClass(w.classOf, w.title) else again(w) }; nav.push(Screen.Live) },
+                    contentAlignment = Alignment.Center) { Icon(Icons.NEXT, Color.White, 24.dp) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun TodayCard(d: Data, nav: Nav) {
-    if (d.live != null || d.routines.isEmpty() || d.finished.any { dayOf(it.start) == today() }) return
+    if (d.live != null || d.routines.isEmpty() || d.finished.any { dayOf(it.start) == today() } || d.s.plans(today()).any { it.first == today() }) return
     val c = LocalContext.current.container
     val lastUse = remember(d.finished) { d.finished.filter { it.routineId > 0 }.groupBy { it.routineId }.mapValues { e -> e.value.maxOf { it.start } } }
     val r = d.routines.minByOrNull { lastUse[it.id] ?: 0L } ?: return
